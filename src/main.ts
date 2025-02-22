@@ -10,8 +10,8 @@ async function bootstrap() {
 
   // config swagger api
   const config = new DocumentBuilder()
-    .setTitle('Vaccination')
-    .setDescription('The Vaccination API description')
+    .setTitle('Nestjs API')
+    .setDescription('The Nestjs API API description')
     .setVersion('1.0')
     .addTag('auth')
     .addTag('user')
@@ -20,7 +20,7 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document, {
-    customSiteTitle: 'Swagger | Vaccination',
+    customSiteTitle: 'Swagger | Nestjs API',
   });
 
   // Configure port on Frontend access side

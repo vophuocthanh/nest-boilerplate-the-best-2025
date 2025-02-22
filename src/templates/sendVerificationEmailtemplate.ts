@@ -65,7 +65,7 @@ export const getVerificationEmailTemplate = (verificationCode: string) => `
     </div>
     <div class="content">
       <p>Chào bạn,</p>
-      <p>Cảm ơn bạn đã đăng ký tài khoản trên nền tảng Vaccination của chúng tôi. Để hoàn tất quá trình đăng ký, vui lòng nhập mã xác thực dưới đây:</p>
+      <p>Cảm ơn bạn đã đăng ký tài khoản trên nền tảng Nestjs API của chúng tôi. Để hoàn tất quá trình đăng ký, vui lòng nhập mã xác thực dưới đây:</p>
       <div class="verification-code">
         ${verificationCode}
       </div>
@@ -73,7 +73,7 @@ export const getVerificationEmailTemplate = (verificationCode: string) => `
       <p>Nếu bạn không thực hiện đăng ký, vui lòng bỏ qua email này.</p>
     </div>
     <div class="footer">
-      <p>Trân trọng,<br>Vaccination Team ❤️🐼🐧🚀⚡⚡</p>
+      <p>Trân trọng,<br>Nestjs API Team ❤️🐼🐧🚀⚡⚡</p>
     </div>
   </div>
 </body>
