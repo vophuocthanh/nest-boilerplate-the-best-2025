@@ -14,32 +14,26 @@ export class RoleService {
   async getRoles(filter: RoleDto): Promise<RoleResponseType> {
     const search = filter.search || '';
 
-    const role = await this.prisma.role.findMany({
+    const roles = await this.prisma.role.findMany({
       where: {
-        OR: [
-          {
-            name: {
-              contains: search,
-            },
-          },
-        ],
+        name: {
+          contains: search,
+          mode: 'insensitive',
+        },
       },
     });
 
     const total = await this.prisma.role.count({
       where: {
-        OR: [
-          {
-            name: {
-              contains: search,
-            },
-          },
-        ],
+        name: {
+          contains: search,
+          mode: 'insensitive',
+        },
       },
     });
 
     return {
-      data: role,
+      data: roles,
       total,
     };
   }

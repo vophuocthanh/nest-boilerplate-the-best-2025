@@ -19,6 +19,10 @@ import { getVerificationEmailTemplate } from 'src/templates/sendVerificationEmai
 
 @Injectable()
 export class AuthService {
+  private static readonly CODE_LENGTH = 6;
+  private static readonly EXPIRATION_MINUTES = 5;
+  private static readonly DEFAULT_ROLE = 'USER';
+  private static readonly BCRYPT_SALT_ROUNDS = 10;
   constructor(
     private prismaService: PrismaService,
     private jwtService: JwtService,
@@ -26,13 +30,13 @@ export class AuthService {
   ) {}
 
   private generateVerificationCode(): { code: string; expiresAt: Date } {
-    const CODE_LENGTH = 6;
-    const EXPIRATION_MINUTES = 5;
-    const code = Array.from({ length: CODE_LENGTH }, () =>
+    const code = Array.from({ length: AuthService.CODE_LENGTH }, () =>
       Math.floor(Math.random() * 10),
     ).join('');
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + EXPIRATION_MINUTES);
+    expiresAt.setMinutes(
+      expiresAt.getMinutes() + AuthService.EXPIRATION_MINUTES,
+    );
     return { code, expiresAt };
   }
 
@@ -51,7 +55,10 @@ export class AuthService {
 
   async register(userData: RegisterDto): Promise<any> {
     await this.validateRegistration(userData);
-    const hashedPassword = await hash(userData.password, 10);
+    const hashedPassword = await hash(
+      userData.password,
+      AuthService.BCRYPT_SALT_ROUNDS,
+    );
     const verificationData = this.generateVerificationCode();
     const defaultRole = await this.getDefaultRole();
 
@@ -90,7 +97,7 @@ export class AuthService {
 
   private async getDefaultRole() {
     const defaultRole = await this.prismaService.role.findUnique({
-      where: { name: 'USER' },
+      where: { name: AuthService.DEFAULT_ROLE },
     });
 
     if (!defaultRole) {
