@@ -1,3 +1,5 @@
+import { HandleAuthGuard } from '@app/src/modules/auth/guard/auth.guard';
+import { UserService } from '@app/src/modules/user/user.service';
 import {
   BadRequestException,
   Body,
@@ -8,7 +10,6 @@ import {
   Post,
   Put,
   Query,
-  Req,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -18,16 +19,14 @@ import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { ApiCommonResponses } from 'src/decorator/api-common-responses.decorator';
 import { CommonPagination } from 'src/decorator/common-pagination.decorator';
+import { CurrentUserId } from 'src/decorator/current-user-id.decorator';
 import { Roles } from 'src/decorator/roles.decorator';
 import { RolesGuard } from 'src/guard/roles.guard';
-import { HandleAuthGuard } from 'src/modules/auth/guard/auth.guard';
 import {
   UpdateUserDto,
   UserFilterType,
   UserPaginationResponseType,
 } from 'src/modules/user/dto/user.dto';
-import { UserService } from 'src/modules/user/user.service';
-import { RequestWithUser } from 'src/types/users';
 
 @ApiBearerAuth()
 @ApiTags('user')
@@ -39,9 +38,8 @@ export class UserController {
   @Get('me')
   @ApiCommonResponses('Lấy ra thông tin user đang đăng nhập')
   async getCurrentUser(
-    @Req() req,
+    @CurrentUserId() userId: string,
   ): Promise<Required<Omit<User, 'password' | 'confirmPassword'>>> {
-    const userId = req.user.id;
     const user = await this.userService.getDetail(userId);
     return user as Required<Omit<User, 'password' | 'confirmPassword'>>;
   }
@@ -78,17 +76,16 @@ export class UserController {
   async updateUserRole(
     @Param('id') id: string,
     @Body('roleId') roleId: string,
-    @Req() req: RequestWithUser,
+    @CurrentUserId() userId: string,
   ) {
-    const userId = req.user.id;
     return this.userService.updateUserRole(id, roleId, userId);
   }
 
   @UseGuards(HandleAuthGuard)
   @Put('me')
   @ApiCommonResponses('Cập nhật thông tin user đang đăng nhập')
-  async updateMe(@Req() req, @Body() data: UpdateUserDto) {
-    return this.userService.updateMeUser(data, req.user.id);
+  async updateMe(@CurrentUserId() userId: string, @Body() data: UpdateUserDto) {
+    return this.userService.updateMeUser(data, userId);
   }
 
   @UseGuards(HandleAuthGuard)
@@ -107,11 +104,14 @@ export class UserController {
     },
   })
   @UseInterceptors(FileInterceptor('file'))
-  async uploadAvatarS3(@Req() req, @UploadedFile() file: Express.Multer.File) {
+  async uploadAvatarS3(
+    @CurrentUserId() userId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
-    return await this.userService.updateAvatarS3(req.user.id, file);
+    return await this.userService.updateAvatarS3(userId, file);
   }
 
   @UseGuards(HandleAuthGuard, RolesGuard)
@@ -120,9 +120,8 @@ export class UserController {
   @ApiCommonResponses('Xóa user')
   async deleteUser(
     @Param('id') id: string,
-    @Req() req: RequestWithUser,
+    @CurrentUserId() currentUserId: string,
   ): Promise<{ message: string }> {
-    const currentUserId = req.user.id;
     return this.userService.deleteUser(id, currentUserId);
   }
 }
