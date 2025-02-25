@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, User } from '@prisma/client';
+import { isEqual } from 'lodash';
 import { FileUploadService } from 'src/lib/file-upload.service';
 import { UpdateUserDto, UserFilterType } from 'src/modules/user/dto/user.dto';
 import { PrismaService } from 'src/prisma.service';
@@ -69,33 +70,35 @@ export class UserService {
     };
   }
 
-  async getDetail(id: string): Promise<any> {
-    const user = await this.prismaService.user.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        email: true,
-        phone: true,
-        address: true,
-        avatar: true,
-        name: true,
-        date_of_birth: true,
-        country: true,
-        createAt: true,
-        updateAt: true,
-        verificationCode: true,
-        verificationCodeExpiresAt: true,
-        isVerified: true,
-        role: {
-          select: {
-            name: true,
-          },
+  async getDetail(id: string): Promise<Partial<User>> {
+    const userSelect = {
+      id: true,
+      email: true,
+      phone: true,
+      address: true,
+      avatar: true,
+      name: true,
+      date_of_birth: true,
+      country: true,
+      createAt: true,
+      updateAt: true,
+      verificationCode: true,
+      verificationCodeExpiresAt: true,
+      isVerified: true,
+      role: {
+        select: {
+          name: true,
         },
       },
+    };
+
+    const user = await this.prismaService.user.findUnique({
+      where: { id },
+      select: userSelect,
     });
 
     if (!user) {
-      throw new BadRequestException('User not found');
+      throw new NotFoundException('User not found');
     }
 
     return user;
@@ -143,11 +146,9 @@ export class UserService {
     const user = await this.prismaService.user.findUnique({
       where: { id: userId },
     });
-
     if (!user) {
       throw new BadRequestException('User not found');
     }
-
     const avatarUrl = await this.fileUploadService.uploadImageToS3(
       file,
       'avatars',
@@ -160,30 +161,29 @@ export class UserService {
   }
 
   async deleteUser(userId: string, currentUserId: string) {
-    // Kiểm tra user cần xóa có tồn tại không
     const userToDelete = await this.prismaService.user.findUnique({
       where: { id: userId },
+      include: {
+        role: {
+          select: {
+            name: true,
+          },
+        },
+      },
     });
 
     if (!userToDelete) {
       throw new NotFoundException('User không tồn tại');
     }
-
-    // Nếu là ADMIN thì không cho phép xóa
-    if (userToDelete.roleId === 'cm15v166c00011r12x9t0ik34') {
+    if (isEqual(userToDelete.role?.name, 'ADMIN')) {
       throw new ForbiddenException('Không thể xóa tài khoản có vai trò ADMIN');
     }
-
-    // Ngăn người dùng tự xóa chính mình
-    if (userToDelete.id === currentUserId) {
+    if (isEqual(userToDelete.id, currentUserId)) {
       throw new ForbiddenException('Không thể tự xóa chính mình');
     }
-
-    // Tiến hành xóa user
     await this.prismaService.user.delete({
       where: { id: userId },
     });
-
     return { message: 'Xóa user thành công' };
   }
 

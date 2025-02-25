@@ -14,15 +14,10 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import {
-  ApiBearerAuth,
-  ApiBody,
-  ApiConsumes,
-  ApiQuery,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { ApiCommonResponses } from 'src/decorator/api-common-responses.decorator';
+import { CommonPagination } from 'src/decorator/common-pagination.decorator';
 import { Roles } from 'src/decorator/roles.decorator';
 import { RolesGuard } from 'src/guard/roles.guard';
 import { HandleAuthGuard } from 'src/modules/auth/guard/auth.guard';
@@ -45,10 +40,10 @@ export class UserController {
   @ApiCommonResponses('Lấy ra thông tin user đang đăng nhập')
   async getCurrentUser(
     @Req() req,
-  ): Promise<Omit<User, 'password' | 'confirmPassword'>> {
+  ): Promise<Required<Omit<User, 'password' | 'confirmPassword'>>> {
     const userId = req.user.id;
     const user = await this.userService.getDetail(userId);
-    return user;
+    return user as Required<Omit<User, 'password' | 'confirmPassword'>>;
   }
 
   @Get('/count-user')
@@ -60,9 +55,7 @@ export class UserController {
   @UseGuards(HandleAuthGuard)
   @Get()
   @ApiCommonResponses('Lấy ra danh sách user')
-  @ApiQuery({ name: 'page', required: false })
-  @ApiQuery({ name: 'items_per_page', required: false })
-  @ApiQuery({ name: 'search', required: false })
+  @CommonPagination()
   getAll(@Query() params: UserFilterType): Promise<UserPaginationResponseType> {
     return this.userService.getAll(params);
   }
@@ -72,8 +65,10 @@ export class UserController {
   @ApiCommonResponses('Lấy ra thông tin chi tiết user')
   getDetail(
     @Param('id') id: string,
-  ): Promise<Omit<User, 'password' | 'confirmPassword'>> {
-    return this.userService.getDetail(id);
+  ): Promise<Required<Omit<User, 'password' | 'confirmPassword'>>> {
+    return this.userService.getDetail(id) as Promise<
+      Required<Omit<User, 'password' | 'confirmPassword'>>
+    >;
   }
 
   @UseGuards(HandleAuthGuard, RolesGuard)
