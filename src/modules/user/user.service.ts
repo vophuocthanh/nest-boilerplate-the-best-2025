@@ -1,4 +1,8 @@
 import {
+  Pagination,
+  PaginationParams,
+} from '@app/src/decorator/pagination.decorator';
+import {
   BadRequestException,
   ForbiddenException,
   HttpException,
@@ -9,7 +13,7 @@ import {
 import { Prisma, User } from '@prisma/client';
 import { isEqual } from 'lodash';
 import { FileUploadService } from 'src/lib/file-upload.service';
-import { UpdateUserDto, UserFilterType } from 'src/modules/user/dto/user.dto';
+import { UpdateUserDto } from 'src/modules/user/dto/user.dto';
 import { PrismaService } from 'src/prisma.service';
 
 @Injectable()
@@ -19,12 +23,8 @@ export class UserService {
     private fileUploadService: FileUploadService,
   ) {}
 
-  async getAll(filters: UserFilterType): Promise<any> {
-    const items_per_page = Number(filters.items_per_page) || 10;
-    const page = Number(filters.page) || 1;
-    const search = filters.search || '';
-    const skip = page > 1 ? (page - 1) * items_per_page : 0;
-
+  async getAll(@Pagination() pagination: PaginationParams): Promise<any> {
+    const { itemsPerPage, skip, search, page } = pagination;
     const where: Prisma.UserWhereInput = search
       ? {
           OR: [
@@ -37,7 +37,7 @@ export class UserService {
     const users = await this.prismaService.user.findMany({
       where,
       skip,
-      take: items_per_page,
+      take: itemsPerPage,
       select: {
         id: true,
         email: true,
@@ -66,7 +66,7 @@ export class UserService {
       data: users,
       total: totalUsers,
       currentPage: page,
-      itemsPerPage: items_per_page,
+      itemsPerPage: itemsPerPage,
     };
   }
 
