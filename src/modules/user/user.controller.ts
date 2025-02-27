@@ -1,3 +1,7 @@
+import {
+  Pagination,
+  PaginationParams,
+} from '@app/src/decorator/pagination.decorator';
 import { HandleAuthGuard } from '@app/src/modules/auth/guard/auth.guard';
 import { UserService } from '@app/src/modules/user/user.service';
 import {
@@ -9,7 +13,6 @@ import {
   Param,
   Post,
   Put,
-  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -24,7 +27,6 @@ import { Roles } from 'src/decorator/roles.decorator';
 import { RolesGuard } from 'src/guard/roles.guard';
 import {
   UpdateUserDto,
-  UserFilterType,
   UserPaginationResponseType,
 } from 'src/modules/user/dto/user.dto';
 
@@ -54,7 +56,9 @@ export class UserController {
   @Get()
   @ApiCommonResponses('Lấy ra danh sách user')
   @CommonPagination()
-  getAll(@Query() params: UserFilterType): Promise<UserPaginationResponseType> {
+  getAll(
+    @Pagination() params: PaginationParams,
+  ): Promise<UserPaginationResponseType> {
     return this.userService.getAll(params);
   }
 
