@@ -1,12 +1,6 @@
 import { numberConstants } from '@app/src/configs/consts';
+import { PaginationParams } from '@app/src/core/model/pagination-params';
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-
-export interface PaginationParams {
-  itemsPerPage: number;
-  page: number;
-  skip: number;
-  search: string;
-}
 
 export const Pagination = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): PaginationParams => {
