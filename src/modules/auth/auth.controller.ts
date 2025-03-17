@@ -1,4 +1,13 @@
-import { Body, Controller, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Put,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import { ApiCommonResponses } from 'src/decorator/api-common-responses.decorator';
@@ -23,7 +32,7 @@ export class AuthController {
 
   @Post('register')
   @ApiCommonResponses('Đăng ký tài khoản')
-  register(@Body() body: RegisterDto): Promise<User> {
+  register(@Body() body: RegisterDto): Promise<{ message: string }> {
     return this.authService.register(body);
   }
 
@@ -79,5 +88,16 @@ export class AuthController {
       password,
       confirm_password,
     );
+  }
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  @ApiCommonResponses('Bắt đầu đăng nhập với Google')
+  async googleAuth(@Request() req) {}
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @ApiCommonResponses('Xử lý callback đăng nhập Google')
+  async googleAuthCallback(@Request() req) {
+    return this.authService.googleLogin(req.user);
   }
 }

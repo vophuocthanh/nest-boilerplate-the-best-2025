@@ -5,7 +5,8 @@
 Table users {
   id String [pk]
   email String [unique, not null]
-  password String [not null]
+  googleId String
+  password String
   phone String
   address String
   avatar String

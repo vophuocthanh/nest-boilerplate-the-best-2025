@@ -23,6 +23,7 @@ export class AuthService {
   private static readonly EXPIRATION_MINUTES = 5;
   private static readonly DEFAULT_ROLE = 'USER';
   private static readonly BCRYPT_SALT_ROUNDS = 10;
+
   constructor(
     private prismaService: PrismaService,
     private jwtService: JwtService,
@@ -53,7 +54,7 @@ export class AuthService {
     });
   }
 
-  async register(userData: RegisterDto): Promise<any> {
+  async register(userData: RegisterDto): Promise<{ message: string }> {
     await this.validateRegistration(userData);
     const hashedPassword = await hash(
       userData.password,
@@ -106,7 +107,6 @@ export class AuthService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
     return defaultRole;
   }
 
@@ -125,14 +125,11 @@ export class AuthService {
         verificationCode: verificationData.code,
         verificationCodeExpiresAt: verificationData.expiresAt,
         isVerified: false,
-        role: {
-          connect: { id: roleId },
-        },
+        role: { connect: { id: roleId } },
       },
     });
   }
 
-  // Xác thực mã xác nhận
   async verifyEmail(email: string, code: string): Promise<{ message: string }> {
     const user = await this.findUserForVerification(email);
     await this.validateVerificationCode(user, code);
@@ -140,7 +137,7 @@ export class AuthService {
     return { message: 'Đăng ký thành công!' };
   }
 
-  private async findUserForVerification(email: string) {
+  private async findUserForVerification(email: string): Promise<User> {
     const user = await this.prismaService.user.findUnique({ where: { email } });
     if (!user) {
       throw new HttpException(
@@ -157,14 +154,17 @@ export class AuthService {
     return user;
   }
 
-  private async validateVerificationCode(user: User, code: string) {
+  private async validateVerificationCode(
+    user: User,
+    code: string,
+  ): Promise<void> {
     if (!isEqual(user.verificationCode, code)) {
       throw new HttpException(
         { message: 'Mã xác thực không đúng' },
         HttpStatus.BAD_REQUEST,
       );
     }
-    if (new Date() > user.verificationCodeExpiresAt) {
+    if (new Date() > user.verificationCodeExpiresAt!) {
       throw new HttpException(
         { message: 'Mã xác thực đã hết hạn' },
         HttpStatus.BAD_REQUEST,
@@ -172,7 +172,7 @@ export class AuthService {
     }
   }
 
-  private async markUserAsVerified(email: string) {
+  private async markUserAsVerified(email: string): Promise<void> {
     await this.prismaService.user.update({
       where: { email },
       data: {
@@ -186,17 +186,13 @@ export class AuthService {
   async login(credentials: { email: string; password: string }): Promise<any> {
     const user = await this.findAndValidateUser(credentials);
     const tokens = await this.generateTokens(user);
-
-    return {
-      ...tokens,
-      user: this.formatUserResponse(user),
-    };
+    return { ...tokens, user: this.formatUserResponse(user) };
   }
 
   private async findAndValidateUser(credentials: {
     email: string;
     password: string;
-  }) {
+  }): Promise<User & { role: { name: string } }> {
     const user = await this.prismaService.user.findUnique({
       where: { email: credentials.email },
       include: { role: true },
@@ -208,18 +204,22 @@ export class AuthService {
         HttpStatus.UNAUTHORIZED,
       );
     }
-
     if (!user.isVerified) {
       throw new HttpException(
         { message: 'Account is not verified' },
         HttpStatus.UNAUTHORIZED,
       );
     }
-
     if (!user.role) {
       throw new HttpException(
         { message: 'User role not assigned' },
         HttpStatus.FORBIDDEN,
+      );
+    }
+    if (!user.password) {
+      throw new HttpException(
+        { message: 'Please use Google login for this account' },
+        HttpStatus.UNAUTHORIZED,
       );
     }
 
@@ -230,18 +230,18 @@ export class AuthService {
         HttpStatus.UNAUTHORIZED,
       );
     }
-
     return user;
   }
 
-  private async generateTokens(user: any) {
+  private async generateTokens(
+    user: any,
+  ): Promise<{ access_token: string; refresh_token: string }> {
     const payload = {
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role.name,
     };
-
     const [access_token, refresh_token] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: process.env.ACCESS_TOKEN_KEY,
@@ -252,11 +252,10 @@ export class AuthService {
         expiresIn: '7d',
       }),
     ]);
-
     return { access_token, refresh_token };
   }
 
-  private formatUserResponse(user: any) {
+  private formatUserResponse(user: any): any {
     return {
       id: user.id,
       name: user.name,
@@ -265,48 +264,42 @@ export class AuthService {
     };
   }
 
-  createToken = async (id: string): Promise<string> => {
+  async createToken(id: string): Promise<string> {
     if (!process.env.ACCESS_TOKEN_KEY) {
       throw new Error(
         'Access token secret key not found in environment variables.',
       );
     }
-
     return this.jwtService.sign(
       { id },
-      {
-        expiresIn: '7d',
-        secret: process.env.ACCESS_TOKEN_KEY,
-      },
+      { expiresIn: '7d', secret: process.env.ACCESS_TOKEN_KEY },
     );
-  };
+  }
 
-  async forgotPassword(data: { email: string }) {
+  async forgotPassword(data: { email: string }): Promise<{ message: string }> {
     const user = await this.findUserByEmail(data.email);
     const access_token = await this.createToken(user.id);
     await this.sendResetPasswordEmail(data.email, access_token);
-
     return {
       message: 'Password reset instructions have been sent to your email.',
     };
   }
 
-  private async findUserByEmail(email: string) {
-    const user = await this.prismaService.user.findUnique({
-      where: { email },
-    });
-
+  private async findUserByEmail(email: string): Promise<User> {
+    const user = await this.prismaService.user.findUnique({ where: { email } });
     if (!user) {
       throw new HttpException(
         { message: `Email ${email} not found` },
         HttpStatus.UNAUTHORIZED,
       );
     }
-
     return user;
   }
 
-  private async sendResetPasswordEmail(email: string, access_token: string) {
+  private async sendResetPasswordEmail(
+    email: string,
+    access_token: string,
+  ): Promise<void> {
     const htmlTemplate = getResetPasswordTemplate(access_token);
     await mailService.sendMail({
       to: email,
@@ -320,32 +313,33 @@ export class AuthService {
     newPassword: string,
   ): Promise<{ message: string }> {
     const userRecord = await this.getUserPassword(user.id);
-    await this.validateNewPassword(newPassword, userRecord.password);
+    if (userRecord.password) {
+      await this.validateNewPassword(newPassword, userRecord.password);
+    }
     await this.updateUserPassword(user.id, newPassword);
-
     return { message: 'Password reset successfully' };
   }
 
-  private async getUserPassword(userId: string) {
+  private async getUserPassword(
+    userId: string,
+  ): Promise<{ password: string | null }> {
     const user = await this.prismaService.user.findUnique({
       where: { id: userId },
       select: { password: true },
     });
-
-    if (!user?.password) {
+    if (!user) {
       throw new HttpException(
-        { message: 'User password is missing' },
-        HttpStatus.BAD_REQUEST,
+        { message: 'User not found' },
+        HttpStatus.NOT_FOUND,
       );
     }
-
     return user;
   }
 
   private async validateNewPassword(
     newPassword: string,
     currentPassword: string,
-  ) {
+  ): Promise<void> {
     const isSamePassword = await compare(newPassword, currentPassword);
     if (isSamePassword) {
       throw new HttpException(
@@ -355,14 +349,17 @@ export class AuthService {
     }
   }
 
-  private async updateUserPassword(userId: string, newPassword: string) {
-    const hashedPassword = await hash(newPassword, 10);
+  private async updateUserPassword(
+    userId: string,
+    newPassword: string,
+  ): Promise<void> {
+    const hashedPassword = await hash(
+      newPassword,
+      AuthService.BCRYPT_SALT_ROUNDS,
+    );
     await this.prismaService.user.update({
       where: { id: userId },
-      data: {
-        password: hashedPassword,
-        confirmPassword: hashedPassword,
-      },
+      data: { password: hashedPassword, confirmPassword: hashedPassword },
     });
   }
 
@@ -373,6 +370,12 @@ export class AuthService {
     confirmPassword: string,
   ): Promise<{ message: string }> {
     const userRecord = await this.getUserPassword(user.id);
+    if (!userRecord.password) {
+      throw new HttpException(
+        { message: 'Google account cannot change password this way' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
     await this.validateCurrentPassword(currentPassword, userRecord.password);
     await this.validatePasswordChange(
       currentPassword,
@@ -380,7 +383,6 @@ export class AuthService {
       confirmPassword,
     );
     await this.updateUserPassword(user.id, newPassword);
-
     return { message: 'Password changed successfully' };
   }
 
@@ -411,7 +413,6 @@ export class AuthService {
         HttpStatus.BAD_REQUEST,
       );
     }
-
     if (!isEqual(newPassword, confirmPassword)) {
       throw new HttpException(
         { message: 'New password and confirm password do not match' },
@@ -429,22 +430,50 @@ export class AuthService {
     if (!userId) {
       throw new UnauthorizedException('Invalid refresh token');
     }
-
     const user = await this.userService.getDetail(userId);
     const access_token = this.jwtService.sign({
       id: user.id,
       email: user.email,
     });
-
     return { access_token };
   }
 
   private async validateRefreshToken(token: string): Promise<string | null> {
     try {
-      const decoded = this.jwtService.verify(token);
-      return decoded.userId;
+      const decoded = this.jwtService.verify(token, {
+        secret: process.env.REFRESH_TOKEN_KEY,
+      });
+      return decoded.id;
     } catch (error) {
       return null;
     }
+  }
+
+  async googleLogin(user: any): Promise<any> {
+    if (!user) {
+      throw new UnauthorizedException('No user from Google');
+    }
+
+    let existingUser = await this.prismaService.user.findFirst({
+      where: { OR: [{ email: user.email }, { googleId: user.googleId }] },
+      include: { role: true },
+    });
+
+    if (!existingUser) {
+      const defaultRole = await this.getDefaultRole();
+      existingUser = await this.prismaService.user.create({
+        data: {
+          email: user.email,
+          name: user.name,
+          googleId: user.googleId,
+          isVerified: true,
+          role: { connect: { id: defaultRole.id } },
+        },
+        include: { role: true },
+      });
+    }
+
+    const tokens = await this.generateTokens(existingUser);
+    return { ...tokens, user: this.formatUserResponse(existingUser) };
   }
 }

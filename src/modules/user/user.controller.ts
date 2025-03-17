@@ -1,7 +1,5 @@
-import {
-  Pagination,
-  PaginationParams,
-} from '@app/src/decorator/pagination.decorator';
+import { PaginationParams } from '@app/src/core/model/pagination-params';
+import { Pagination } from '@app/src/decorator/pagination.decorator';
 import { HandleAuthGuard } from '@app/src/modules/auth/guard/auth.guard';
 import { UserService } from '@app/src/modules/user/user.service';
 import {
