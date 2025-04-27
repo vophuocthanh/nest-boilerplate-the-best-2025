@@ -8,14 +8,12 @@ import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
 import { compare, hash } from 'bcrypt';
 import { isEqual } from 'lodash';
-import { mailService } from 'src/lib/mail.service';
+import { MailService } from '../mail/mail.service';
 import { RefreshTokenDto } from 'src/modules/auth/dto/refresh-token.dto';
 import { RegisterDto } from 'src/modules/auth/dto/register.dto';
 import { SendVerificationEmailDto } from 'src/modules/auth/dto/verify-code';
 import { UserService } from 'src/modules/user/user.service';
 import { PrismaService } from 'src/prisma.service';
-import { getResetPasswordTemplate } from 'src/templates/emailTemplate';
-import { getVerificationEmailTemplate } from 'src/templates/sendVerificationEmailtemplate';
 
 @Injectable()
 export class AuthService {
@@ -28,6 +26,7 @@ export class AuthService {
     private prismaService: PrismaService,
     private jwtService: JwtService,
     private userService: UserService,
+    private mailService: MailService,
   ) {}
 
   private generateVerificationCode(): { code: string; expiresAt: Date } {
@@ -41,16 +40,17 @@ export class AuthService {
     return { code, expiresAt };
   }
 
-  // Gửi email xác thực
   async sendVerificationEmail({
     email,
     verificationCode,
   }: SendVerificationEmailDto) {
-    const htmlTemplate = getVerificationEmailTemplate(verificationCode);
-    await mailService.sendMail({
+    await this.mailService.sendMail({
       to: email,
-      html: htmlTemplate,
       subject: 'Xác nhận đăng ký tài khoản',
+      template: 'verification-email',
+      context: {
+        verificationCode,
+      },
     });
   }
 
@@ -300,11 +300,13 @@ export class AuthService {
     email: string,
     access_token: string,
   ): Promise<void> {
-    const htmlTemplate = getResetPasswordTemplate(access_token);
-    await mailService.sendMail({
+    await this.mailService.sendMail({
       to: email,
-      html: htmlTemplate,
-      subject: 'Reset password',
+      subject: 'Reset mật khẩu',
+      template: 'reset-password',
+      context: {
+        resetToken: access_token,
+      },
     });
   }
 

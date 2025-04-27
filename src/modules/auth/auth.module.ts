@@ -7,6 +7,7 @@ import { UserService } from 'src/modules/user/user.service';
 import { PrismaService } from 'src/prisma.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { MailService } from '@app/src/modules/mail/mail.service';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AuthService } from './auth.service';
     UserService,
     FileUploadService,
     UserService,
+    MailService,
   ],
 })
 export class AuthModule {}
