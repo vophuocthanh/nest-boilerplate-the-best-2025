@@ -2,7 +2,7 @@
 . "$(dirname -- "$0")/_/husky.sh"
 
 # Chạy lint-staged để kiểm tra và format những file đã thay đổi
-npm run lint-staged
+npx lint-staged
 
 # Chạy test để đảm bảo không có test nào bị fail
-npm run test 
+npx jest 
