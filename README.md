@@ -1,82 +1,231 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# NestJS Boilerplate
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A robust and scalable NestJS boilerplate with modern best practices, ready for production use.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
+## 🛠️ Tech Stack
 
-## Tech Stack
+<div align="center">
+  <img src="https://img.shields.io/badge/nestjs-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" alt="nestjs" />
+  <img src="https://img.shields.io/badge/typescript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="typescript" />
+  <img src="https://img.shields.io/badge/postgresql-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="postgresql" />
+  <img src="https://img.shields.io/badge/prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white" alt="prisma" />
+  <img src="https://img.shields.io/badge/docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="docker" />
+  <img src="https://img.shields.io/badge/aws-232F3E?style=for-the-badge&logo=amazonaws&logoColor=white" alt="aws" />
+  <img src="https://img.shields.io/badge/jest-C21325?style=for-the-badge&logo=jest&logoColor=white" alt="jest" />
+  <img src="https://img.shields.io/badge/socket.io-010101?style=for-the-badge&logo=socket.io&logoColor=white" alt="socket.io" />
+</div>
 
-  <div align="center">
-    <img src="https://img.shields.io/badge/nestjs-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" alt="nestjs" />
-    <img src="https://img.shields.io/badge/-TypeScript-black?style=for-the-badge&logoColor=white&logo=typescript&color=3178C6" alt="typescript" />
-    <img src="https://img.shields.io/badge/postgresql-4169e1?style=for-the-badge&logo=postgresql&logoColor=white" alt="postgresql" />
-    <img src="https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white" alt="prisma" />
-  </div>
+## 🚀 Features
 
-## Installation
+- **Authentication & Authorization**
+
+  - JWT-based authentication
+  - Google OAuth2.0 integration
+  - Role-based access control
+
+- **Database**
+
+  - Prisma ORM integration
+  - PostgreSQL database support
+  - Database migrations and seeding
+
+- **API Documentation**
+
+  - Swagger/OpenAPI integration
+  - API versioning
+  - Request/Response validation
+
+- **File Handling**
+
+  - AWS S3 integration
+  - File upload support
+  - Static file serving
+
+- **Email Service**
+
+  - Nodemailer integration
+  - HTML email templates
+  - Email queue system
+
+- **Real-time Features**
+
+  - WebSocket support
+  - Socket.IO integration
+  - Real-time notifications
+
+- **Development Tools**
+  - TypeScript support
+  - ESLint & Prettier configuration
+  - Husky pre-commit hooks
+  - Conventional commit messages
+  - Jest testing framework
+
+## 📋 Prerequisites
+
+- Node.js (v16 or higher)
+- PostgreSQL
+- Docker and Docker Compose (optional)
+- AWS S3 account (for file storage)
+- Google OAuth credentials (for Google login)
+
+## 🛠️ Installation
+
+1. Clone the repository:
 
 ```bash
-$ npm install
+git clone <repository-url>
+cd nest-boilerplate
 ```
 
-## Set Up Environment Variables
-
-Create a new file named `.env` in the root of your project and add the following content:
-
-```env
-DATABASE_URL=
-ACCESS_TOKEN_KEY=
-REFRESH_TOKEN_KEY=
-MAIL_TRANSPORT=
-MAIL_FROM=
-JWT_SECRET=
-AWS_REGION=
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-AWS_S3_BUCKET_NAME=
-```
-
-## Running the app
+2. Install dependencies:
 
 ```bash
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+npm install
 ```
 
-## Test
+3. Set up environment variables:
 
 ```bash
-# unit tests
-$ npm run test
+cp .env.example .env
+```
+
+Edit the `.env` file with your configuration.
+
+4. Set up the database:
+
+```bash
+npx prisma generate
+```
+
+## 🚀 Running the Application
+
+### Development
+
+```bash
+npm run start:dev
+```
+
+### Production
+
+```bash
+npm run build
+npm run start:prod
+```
+
+### Docker
+
+```bash
+docker-compose build
+```
+
+#### Run start
+
+```bash
+docker-compose up -d
+```
+
+## 📚 API Documentation
+
+Once the application is running, you can access the Swagger documentation at:
+
+```
+http://localhost:3001/api
+```
+
+## 🧪 Testing
+
+```bash
+# Unit tests
+npm run test
 
 # e2e tests
-$ npm run test:e2e
+npm run test:e2e
 
-# test coverage
-$ npm run test:cov
+# Test coverage
+npm run test:cov
 ```
 
-Open http://localhost:3001/api with your favorite browser to swagger.
+## 📦 Project Structure
 
----
+```
+src/
+├── config/         # Configuration files
+├── modules/        # Feature modules
+├── common/         # Shared resources
+├── decorators/     # Custom decorators
+├── filters/        # Exception filters
+├── guards/         # Authentication guards
+├── interceptors/   # Request/Response interceptors
+├── interfaces/     # TypeScript interfaces
+├── middleware/     # Custom middleware
+├── pipes/          # Validation pipes
+└── utils/          # Utility functions
+```
 
-Made with ♥ by [ThanhDev](https://www.facebook.com/thanh.vophuoc.50)
+## 🔧 Available Scripts
+
+- `npm run start` - Start the application
+- `npm run start:dev` - Start the application in development mode
+- `npm run start:debug` - Start the application in debug mode
+- `npm run start:prod` - Start the application in production mode
+- `npm run build` - Build the application
+- `npm run test` - Run unit tests
+- `npm run test:e2e` - Run end-to-end tests
+- `npm run test:cov` - Run test coverage
+- `npm run lint` - Lint the code
+- `npm run format` - Format the code
+
+## 🔐 Environment Variables
+
+Required environment variables:
+
+```env
+# Application
+PORT=3001
+NODE_ENV=development
+
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
+
+# JWT
+JWT_SECRET=your-jwt-secret
+JWT_EXPIRATION=1d
+
+# AWS S3
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_REGION=your-region
+AWS_BUCKET_NAME=your-bucket
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_CALLBACK_URL=http://localhost:3001/auth/google/callback
+
+# Email
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your-email
+SMTP_PASS=your-password
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 👥 Authors
+
+- Made with ♥ by [ThanhDev](https://www.facebook.com/thanh.vophuoc.50)
+
+## 🙏 Acknowledgments
+
+- NestJS team for the amazing framework
+- All contributors who have helped shape this boilerplate
