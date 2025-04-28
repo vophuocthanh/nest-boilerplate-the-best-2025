@@ -17,7 +17,7 @@ import { RoleDto } from 'src/modules/role/dto/role.dto';
 import { RoleService } from 'src/modules/role/role.service';
 
 @ApiBearerAuth()
-@ApiTags('role')
+@ApiTags('Role')
 @Controller('role')
 export class RoleController {
   constructor(private rolesService: RoleService) {}

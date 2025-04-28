@@ -29,7 +29,7 @@ import {
 } from 'src/modules/user/dto/user.dto';
 
 @ApiBearerAuth()
-@ApiTags('user')
+@ApiTags('User')
 @Controller('user')
 export class UserController {
   constructor(private userService: UserService) {}

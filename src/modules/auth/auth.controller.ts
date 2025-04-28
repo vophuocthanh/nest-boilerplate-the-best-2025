@@ -25,7 +25,7 @@ import { VerifyEmailDto } from 'src/modules/auth/dto/verify-code';
 import { HandleAuthGuard } from 'src/modules/auth/guard/auth.guard';
 
 @ApiBearerAuth()
-@ApiTags('auth')
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
@@ -92,7 +92,9 @@ export class AuthController {
   @Get('google')
   @UseGuards(AuthGuard('google'))
   @ApiCommonResponses('Bắt đầu đăng nhập với Google')
-  async googleAuth(@Request() req) {}
+  async googleAuth(@Request() req) {
+    return req;
+  }
 
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))

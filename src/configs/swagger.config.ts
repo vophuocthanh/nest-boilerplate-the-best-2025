@@ -3,7 +3,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 const APP_TITLE = 'Nestjs API';
 const SWAGGER_PATH = 'api';
-const API_TAGS = ['Auth', 'User', 'Role'];
+const API_TAGS = ['Auth', 'User', 'Role', 'File Upload'];
 
 export const setupSwagger = (app: NestExpressApplication): void => {
   const config = new DocumentBuilder()

@@ -4,16 +4,9 @@ import { FileUploadService } from 'src/lib/file-upload.service';
 import { PrismaService } from 'src/prisma.service';
 import { UserController } from './user.controller';
 import { UserService } from './user.service';
-import { GoogleStrategy } from '@app/src/modules/auth/google.strategy';
 
 @Module({
   controllers: [UserController],
-  providers: [
-    UserService,
-    PrismaService,
-    JwtService,
-    FileUploadService,
-    GoogleStrategy,
-  ],
+  providers: [UserService, PrismaService, JwtService, FileUploadService],
 })
 export class UserModule {}
