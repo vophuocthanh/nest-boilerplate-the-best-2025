@@ -14,7 +14,7 @@ import { RegisterDto } from 'src/modules/auth/dto/register.dto';
 import { SendVerificationEmailDto } from 'src/modules/auth/dto/verify-code';
 import { UserService } from 'src/modules/user/user.service';
 import { PrismaService } from 'src/prisma.service';
-
+import { ForgotPasswordDto } from '@app/src/modules/auth/dto/auth.dto';
 @Injectable()
 export class AuthService {
   private static readonly CODE_LENGTH = 6;
@@ -276,7 +276,7 @@ export class AuthService {
     );
   }
 
-  async forgotPassword(data: { email: string }): Promise<{ message: string }> {
+  async forgotPassword(data: ForgotPasswordDto): Promise<{ message: string }> {
     const user = await this.findUserByEmail(data.email);
     const access_token = await this.createToken(user.id);
     await this.sendResetPasswordEmail(data.email, access_token);
@@ -477,5 +477,17 @@ export class AuthService {
 
     const tokens = await this.generateTokens(existingUser);
     return { ...tokens, user: this.formatUserResponse(existingUser) };
+  }
+
+  // re send verification email
+  async resendVerificationEmail(email: string): Promise<{ message: string }> {
+    const user = await this.findUserByEmail(email);
+    const verificationData = this.generateVerificationCode();
+    await this.sendVerificationEmail({
+      email: user.email,
+      verificationCode: verificationData.code,
+    });
+
+    return { message: 'Email xác thực đã được gửi lại' };
   }
 }

@@ -16,6 +16,7 @@ import { CurrentUser } from 'src/modules/auth/decorator/current-user.decorator';
 import {
   ChangePasswordDto,
   ForgotPasswordDto,
+  ResendVerificationEmailDto,
   ResetPasswordDto,
 } from 'src/modules/auth/dto/auth.dto';
 import { LoginDto } from 'src/modules/auth/dto/login.dto';
@@ -101,5 +102,11 @@ export class AuthController {
   @ApiCommonResponses('Xử lý callback đăng nhập Google')
   async googleAuthCallback(@Request() req) {
     return this.authService.googleLogin(req.user);
+  }
+
+  @Post('resend-verification-email')
+  @ApiCommonResponses('Gửi lại email xác thực')
+  async resendVerificationEmail(@Body() body: ResendVerificationEmailDto) {
+    return this.authService.resendVerificationEmail(body.email);
   }
 }

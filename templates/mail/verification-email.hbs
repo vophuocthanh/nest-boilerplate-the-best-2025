@@ -1,24 +1,84 @@
-<html>
+<html lang='vi'>
   <head>
     <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1.0' />
     <title>Xác nhận đăng ký tài khoản</title>
     <style>
-      body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-      .container { max-width: 600px; margin: 0 auto; padding: 20px; } .code {
-      font-size: 24px; font-weight: bold; color: #007bff; text-align: center;
-      padding: 20px; background: #f8f9fa; border-radius: 5px; margin: 20px 0; }
+      * { margin: 0; padding: 0; box-sizing: border-box; } body { font-family:
+      'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color:
+      #333; background-color: #f5f7fa; } .email-container { max-width: 600px;
+      margin: 20px auto; background-color: #ffffff; border-radius: 8px;
+      overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+      .email-header { background: linear-gradient(135deg, #4776E6 0%, #8E54E9
+      100%); padding: 30px 20px; text-align: center; } .email-header h1 { color:
+      white; font-size: 24px; font-weight: 600; margin: 0; } .logo { width:
+      60px; height: 60px; background-color: white; border-radius: 50%; margin: 0
+      auto 15px; line-height: 60px; text-align: center; } .icon-xac-nhan {
+      font-size: 18px; color: #4776E6; font-weight: bold; } .email-content {
+      padding: 30px; } .greeting { font-size: 18px; margin-bottom: 15px; }
+      .message { color: #525f7f; margin-bottom: 25px; } .verification-code {
+      background-color: #f8f9fa; border-radius: 6px; padding: 20px; text-align:
+      center; margin: 30px 0; border: 1px dashed #e4e8ef; } .code { font-size:
+      32px; font-weight: bold; color: #5e72e4; letter-spacing: 5px; }
+      .code-instruction { font-size: 14px; color: #8898aa; margin-top: 8px; }
+      .expiry-note { padding: 15px 0; font-size: 14px; color: #8898aa; display:
+      flex; align-items: center; justify-content: center; } .expiry-note i {
+      margin-right: 8px; } .footer { background-color: #f8f9fa; padding: 20px;
+      text-align: center; font-size: 14px; color: #8898aa; border-top: 1px solid
+      #e4e8ef; } .company-info { margin-top: 15px; } .ignore-message {
+      background-color: #fcf8e3; border-radius: 6px; padding: 15px; margin: 25px
+      0 15px; font-size: 14px; color: #8a6d3b; } .button { background-color:
+      #5e72e4; color: white; padding: 12px 30px; text-decoration: none;
+      border-radius: 4px; display: inline-block; font-weight: 600; margin-top:
+      15px; transition: background-color 0.3s; } .button:hover {
+      background-color: #4454c3; } @media only screen and (max-width: 600px) {
+      .email-container { margin: 0; border-radius: 0; } .email-content {
+      padding: 20px; } }
     </style>
   </head>
   <body>
-    <div class='container'>
-      <h1>Xác nhận đăng ký tài khoản</h1>
-      <p>Xin chào,</p>
-      <p>Cảm ơn bạn đã đăng ký tài khoản. Vui lòng sử dụng mã xác nhận sau để
-        hoàn tất quá trình đăng ký:</p>
-      <div class='code'>{{verificationCode}}</div>
-      <p>Mã xác nhận này sẽ hết hạn sau 24 giờ.</p>
-      <p>Nếu bạn không yêu cầu đăng ký tài khoản, vui lòng bỏ qua email này.</p>
-      <p>Trân trọng,<br />Đội ngũ hỗ trợ</p>
+    <div class='email-container'>
+      <div class='email-header'>
+        <div class='logo'>
+          <span class='icon-xac-nhan'>&#9989;</span>
+        </div>
+        <h1>Xác nhận đăng ký tài khoản</h1>
+      </div>
+
+      <div class='email-content'>
+        <p class='greeting'>Xin chào quý khách,</p>
+
+        <p class='message'>Cảm ơn bạn đã đăng ký tài khoản tại dịch vụ của chúng
+          tôi. Để hoàn tất quá trình đăng ký và kích hoạt tài khoản của bạn, vui
+          lòng sử dụng mã xác nhận dưới đây:</p>
+
+        <div class='verification-code'>
+          <div class='code'>{{verificationCode}}</div>
+          <div class='code-instruction'>Nhập mã này vào trang xác nhận đăng ký</div>
+        </div>
+
+        <div class='expiry-note'>
+          <i>⏱</i>
+          Mã xác nhận này sẽ hết hạn sau 24 giờ
+        </div>
+
+        <div class='ignore-message'>
+          Nếu bạn không yêu cầu đăng ký tài khoản, vui lòng bỏ qua email này
+          hoặc liên hệ với đội ngũ hỗ trợ của chúng tôi.
+        </div>
+
+        <p class='message'>Nếu bạn cần hỗ trợ thêm, vui lòng liên hệ với chúng
+          tôi qua email:
+          <strong>hotro@example.com</strong></p>
+
+        <p class='message'>Trân trọng,<br />Đội ngũ hỗ trợ</p>
+      </div>
+
+      <div class='footer'>
+        <div>© 2025 Công ty của bạn. Tất cả các quyền được bảo lưu.</div>
+        <div class='company-info'>Địa chỉ: 123 Đường ABC, Quận XYZ, Thành phố
+          HCM</div>
+      </div>
     </div>
   </body>
 </html>
