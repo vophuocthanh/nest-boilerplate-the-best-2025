@@ -13,6 +13,7 @@ import { isEqual } from 'lodash';
 import { FileUploadService } from 'src/lib/file-upload.service';
 import { UpdateUserDto } from 'src/modules/user/dto/user.dto';
 import { PrismaService } from 'src/prisma.service';
+import { ResponseUtil } from '../../utils/response.util';
 
 @Injectable()
 export class UserService {
@@ -60,12 +61,7 @@ export class UserService {
 
     const totalUsers = await this.prismaService.user.count({ where });
 
-    return {
-      data: users,
-      total: totalUsers,
-      currentPage: page,
-      itemsPerPage: itemsPerPage,
-    };
+    return ResponseUtil.paginate(users, totalUsers, page, itemsPerPage);
   }
 
   async getDetail(id: string): Promise<Partial<User>> {

@@ -32,6 +32,10 @@ model User {
   role                      Role?     @relation(fields: [roleId], references: [id])
   points                    Int?      @default(0)
 
+  // Message relations
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+
   @@map("users")
 }
 
@@ -41,4 +45,23 @@ model Role {
   users User[]
 
   @@map("roles")
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  senderId   String
+  sender     User   @relation("SentMessages", fields: [senderId], references: [id])
+  receiverId String
+  receiver   User   @relation("ReceivedMessages", fields: [receiverId], references: [id])
+
+  // Optional fields for message status
+  isRead Boolean   @default(false)
+  readAt DateTime?
+
+  @@map("messages")
 }
