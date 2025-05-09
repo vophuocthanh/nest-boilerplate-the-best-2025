@@ -42,4 +42,37 @@ export class ResponseUtil {
       status,
     };
   }
+
+  // Format any response with excluded fields
+  static formatResponse<T>(data: T, excludeFields: string[] = []): T {
+    if (Array.isArray(data)) {
+      return data.map((item) => this.formatResponse(item, excludeFields)) as T;
+    }
+
+    if (typeof data === 'object' && data !== null) {
+      const formattedData = { ...data };
+      excludeFields.forEach((field) => {
+        delete formattedData[field];
+      });
+      return formattedData as T;
+    }
+
+    return data;
+  }
+
+  static formatUserResponse<T>(user: T): T {
+    const defaultExcludedFields = [
+      'password',
+      'confirmPassword',
+      'verificationCode',
+      'verificationCodeExpiresAt',
+    ];
+    return this.formatResponse(user, defaultExcludedFields);
+  }
+
+  // Format message response with default excluded fields
+  static formatMessageResponse<T>(message: T): T {
+    const defaultExcludedFields = ['deletedAt'];
+    return this.formatResponse(message, defaultExcludedFields);
+  }
 }

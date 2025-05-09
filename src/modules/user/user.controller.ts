@@ -25,7 +25,8 @@ import { Roles } from 'src/decorator/roles.decorator';
 import { RolesGuard } from 'src/guard/roles.guard';
 import {
   UpdateUserDto,
-  UserPaginationResponseType,
+  UpdateUserRoleDto,
+  UserPaginationResponse,
 } from 'src/modules/user/dto/user.dto';
 
 @ApiBearerAuth()
@@ -56,7 +57,7 @@ export class UserController {
   @CommonPagination()
   getAll(
     @Pagination() params: PaginationParams,
-  ): Promise<UserPaginationResponseType> {
+  ): Promise<UserPaginationResponse> {
     return this.userService.getAll(params);
   }
 
@@ -77,10 +78,10 @@ export class UserController {
   @ApiCommonResponses('Cập nhật role cho user')
   async updateUserRole(
     @Param('id') id: string,
-    @Body('roleId') roleId: string,
+    @Body() data: UpdateUserRoleDto,
     @CurrentUserId() userId: string,
   ) {
-    return this.userService.updateUserRole(id, roleId, userId);
+    return this.userService.updateUserRole(id, data.roleId, userId);
   }
 
   @UseGuards(HandleAuthGuard)

@@ -1,3 +1,4 @@
+import { ResponseFormat } from '@app/src/types/response.interface';
 import { ApiProperty } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 import {
@@ -52,15 +53,10 @@ export class UpdateUserDto {
   roleId?: string;
 }
 
-export interface UserFilterType {
-  items_per_page?: number;
-  page?: number;
-  search?: string;
+export class UpdateUserRoleDto {
+  @ApiProperty()
+  @IsNotEmpty()
+  roleId: string;
 }
 
-export interface UserPaginationResponseType {
-  data: User[];
-  total: number;
-  currentPage: number;
-  itemsPerPage: number;
-}
+export type UserPaginationResponse = ResponseFormat<User[]>;

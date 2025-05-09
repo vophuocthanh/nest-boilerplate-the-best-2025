@@ -13,6 +13,7 @@ import { isEqual } from 'lodash';
 import { FileUploadService } from 'src/lib/file-upload.service';
 import { UpdateUserDto } from 'src/modules/user/dto/user.dto';
 import { PrismaService } from 'src/prisma.service';
+import { ResponseFormat } from '../../types/response.interface';
 import { ResponseUtil } from '../../utils/response.util';
 
 @Injectable()
@@ -98,20 +99,23 @@ export class UserService {
     return user;
   }
 
-  async updateMeUser(data: UpdateUserDto, id: string): Promise<User> {
-    return await this.prismaService.user.update({
-      where: {
-        id,
-      },
+  async updateMeUser(data: UpdateUserDto, id: string) {
+    const user = await this.prismaService.user.update({
+      where: { id },
       data,
     });
+
+    return ResponseUtil.success(
+      ResponseUtil.formatUserResponse(user),
+      'User updated successfully',
+    );
   }
 
   async updateUserRole(
     userId: string,
     roleId: string,
     currentUserId: string,
-  ): Promise<User> {
+  ): Promise<ResponseFormat<User>> {
     if (userId === currentUserId) {
       throw new ForbiddenException('You cannot update your own role.');
     }
@@ -127,10 +131,15 @@ export class UserService {
       );
     }
 
-    return await this.prismaService.user.update({
+    const user = await this.prismaService.user.update({
       where: { id: userId },
       data: { roleId },
     });
+
+    return ResponseUtil.success(
+      ResponseUtil.formatUserResponse(user),
+      'User role updated successfully',
+    );
   }
 
   async updateAvatarS3(
