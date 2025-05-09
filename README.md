@@ -181,9 +181,30 @@ cp .env.example .env
 
 4. Configure your database:
 
+##### Add migration
+
+```bash
+npx prisma migrate dev --name desctiptive_name
+```
+
+##### Generate client
+
 ```bash
 npx prisma generate
-npx prisma migrate dev
+```
+
+Every time you change the `schema.primsa` file, rerun the command.
+
+##### Add migration
+
+```bash
+npx prisma migrate dev --name desctiptive_name
+```
+
+##### Generate client
+
+```bash
+npx prisma generate
 ```
 
 5. Start the application:
