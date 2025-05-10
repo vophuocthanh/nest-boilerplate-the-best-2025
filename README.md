@@ -181,31 +181,25 @@ cp .env.example .env
 
 4. Configure your database:
 
-##### Add migration
+##### Initial setup after cloning
 
 ```bash
-npx prisma migrate dev --name desctiptive_name
+npx prisma migrate dev
 ```
 
-##### Generate client
+##### When making changes to schema.prisma
 
 ```bash
-npx prisma generate
+npx prisma migrate dev --name descriptive_name
 ```
 
-Every time you change the `schema.primsa` file, rerun the command.
-
-##### Add migration
-
-```bash
-npx prisma migrate dev --name desctiptive_name
-```
-
-##### Generate client
+##### Generate Prisma Client
 
 ```bash
 npx prisma generate
 ```
+
+Note: Run `npx prisma generate` after any changes to schema.prisma to update TypeScript types.
 
 5. Start the application:
 
