@@ -3,6 +3,7 @@ import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.int
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
+import { loggerMiddleware } from './middlewares/logger.middleware';
 
 const API_PREFIX = 'api';
 const PORT = 3001;
@@ -18,6 +19,8 @@ async function bootstrap() {
   app.setGlobalPrefix(API_PREFIX);
   app.enableCors(CORS_OPTIONS);
   setupSwagger(app);
+
+  app.use(loggerMiddleware);
 
   await app.listen(PORT);
 }
