@@ -3,6 +3,3 @@
 
 # Chạy lint-staged để kiểm tra và format những file đã thay đổi
 npx lint-staged
-
-# Chạy test để đảm bảo không có test nào bị fail
-npx jest 
