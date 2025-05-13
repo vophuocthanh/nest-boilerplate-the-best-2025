@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { ValidationFieldError } from './validation.middleware';
 
 /**
  * Middleware ghi log request API với giao diện đẹp trong terminal
@@ -161,12 +162,31 @@ export const loggerMiddleware = (
     );
   }
 
+  // Sao lưu các phương thức nguyên bản
+  const originalSend = res.send;
+  const originalJson = res.json;
+
+  // Ghi đè phương thức json để bắt response
+  res.json = function (body) {
+    (res as any).responseBody = body;
+    return originalJson.call(this, body);
+  };
+
+  // Ghi đè phương thức send để bắt response
+  res.send = function (body) {
+    (res as any).responseBody = body;
+    return originalSend.call(this, body);
+  };
+
   // Lắng nghe sự kiện kết thúc để log thời gian phản hồi
   res.on('finish', () => {
     const duration = Date.now() - start;
     const statusCode = res.statusCode;
     const contentLength = res.getHeader('content-length') || '-';
     const contentType = res.getHeader('content-type') || '-';
+
+    // Lấy body response nếu có
+    const responseBody = (res as any).responseBody;
 
     // Màu cho status code và trạng thái
     let statusColor: string;
@@ -235,6 +255,58 @@ export const loggerMiddleware = (
     console.log(
       `${typeInfo}${' '.repeat(typePadding)}${dim}${boxVertical}${resetColor}`,
     );
+
+    // Hiển thị lỗi validation từ request nếu có (được lưu từ middleware validation)
+    let validationErrors: ValidationFieldError[] = [];
+
+    // Lấy thông tin lỗi validation từ request nếu có
+    if ((req as any).validationErrors) {
+      validationErrors = (req as any).validationErrors;
+    }
+    // Hoặc từ response nếu có
+    else if (
+      responseBody &&
+      responseBody.message &&
+      typeof responseBody.message === 'object'
+    ) {
+      // Chuyển đổi từ object sang mảng để hiển thị
+      Object.keys(responseBody.message).forEach((field) => {
+        validationErrors.push({
+          field,
+          message: responseBody.message[field],
+        });
+      });
+    }
+
+    // Nếu có lỗi validation, hiển thị chi tiết
+    if (validationErrors.length > 0) {
+      // Vạch ngăn trước khi hiển thị lỗi validation
+      console.log(
+        `${dim}${boxLeftT}${boxHorizontal.repeat(boxWidth - 2)}${boxRightT}${resetColor}`,
+      );
+
+      // Tiêu đề validation
+      const validationTitle = `${dim}${boxVertical}${resetColor} ${bgBlack}${brightWhite}${bold} VALIDATION ERRORS ${resetColor}`;
+      console.log(
+        `${validationTitle}${' '.repeat(boxWidth - validationTitle.length + dim.length + resetColor.length * 2)}${dim}${boxVertical}${resetColor}`,
+      );
+
+      // Hiển thị từng lỗi validation
+      validationErrors.forEach((error: ValidationFieldError) => {
+        const errorLine = `${dim}${boxVertical}${resetColor} ${underline}${error.field}${resetColor}: ${'\x1b[31m'}${error.message}${resetColor}`;
+        const errorPadding = Math.max(
+          0,
+          boxWidth -
+            errorLine.length +
+            dim.length +
+            resetColor.length * 3 +
+            underline.length,
+        );
+        console.log(
+          `${errorLine}${' '.repeat(errorPadding)}${dim}${boxVertical}${resetColor}`,
+        );
+      });
+    }
 
     // Khung dưới
     console.log(

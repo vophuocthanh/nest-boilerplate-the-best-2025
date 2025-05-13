@@ -20,14 +20,17 @@ export class HandleAuthGuard implements CanActivate {
 
     if (!authHeader) {
       throw new HttpException(
-        'Authorization header missing',
+        { message: { authorization: 'Authorization header missing' } },
         HttpStatus.UNAUTHORIZED,
       );
     }
 
     const token = authHeader.split(' ')[1];
     if (!token) {
-      throw new HttpException('Token missing', HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        { message: { token: 'Token missing' } },
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
     try {
@@ -37,7 +40,10 @@ export class HandleAuthGuard implements CanActivate {
       request.user = payload;
       return true;
     } catch (error) {
-      throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        { message: { token: 'Invalid token' } },
+        HttpStatus.UNAUTHORIZED,
+      );
     }
   }
 }

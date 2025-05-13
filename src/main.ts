@@ -4,6 +4,8 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { loggerMiddleware } from './middlewares/logger.middleware';
+import { ValidationPipe } from '@nestjs/common';
+import { globalErrorHandler } from './middlewares/validation.middleware';
 
 const API_PREFIX = 'api';
 const PORT = 3001;
@@ -20,7 +22,26 @@ async function bootstrap() {
   app.enableCors(CORS_OPTIONS);
   setupSwagger(app);
 
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+      stopAtFirstError: false,
+      validationError: {
+        target: false,
+        value: false,
+      },
+    }),
+  );
+
+  // app.useGlobalInterceptors(new ResponseInterceptor());
+
   app.use(loggerMiddleware);
+  app.use(globalErrorHandler);
 
   await app.listen(PORT);
 }

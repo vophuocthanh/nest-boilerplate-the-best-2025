@@ -83,14 +83,35 @@ export class AuthService {
 
     if (existingUser) {
       throw new HttpException(
-        { message: 'Email đã được sử dụng' },
+        { message: { email: 'Email đã được sử dụng' } },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Password validation
+    if (!userData.password) {
+      throw new HttpException(
+        { message: { password: 'Mật khẩu không được để trống' } },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (!userData.confirmPassword) {
+      throw new HttpException(
+        {
+          message: { confirmPassword: 'Xác nhận mật khẩu không được để trống' },
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
 
     if (!isEqual(userData.password, userData.confirmPassword)) {
       throw new HttpException(
-        { message: 'Mật khẩu không khớp' },
+        {
+          message: {
+            confirmPassword: 'Xác nhận mật khẩu không khớp với mật khẩu',
+          },
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -103,7 +124,7 @@ export class AuthService {
 
     if (!defaultRole) {
       throw new HttpException(
-        { message: 'Không tìm thấy vai trò mặc định' },
+        { message: { role: 'Không tìm thấy vai trò mặc định' } },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -141,13 +162,13 @@ export class AuthService {
     const user = await this.prismaService.user.findUnique({ where: { email } });
     if (!user) {
       throw new HttpException(
-        { message: 'Người dùng không tồn tại' },
+        { message: { email: 'Người dùng không tồn tại' } },
         HttpStatus.NOT_FOUND,
       );
     }
     if (user.isVerified) {
       throw new HttpException(
-        { message: 'Người dùng đã xác thực' },
+        { message: { email: 'Người dùng đã xác thực' } },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -160,13 +181,13 @@ export class AuthService {
   ): Promise<void> {
     if (!isEqual(user.verificationCode, code)) {
       throw new HttpException(
-        { message: 'Mã xác thực không đúng' },
+        { message: { code: 'Mã xác thực không đúng' } },
         HttpStatus.BAD_REQUEST,
       );
     }
     if (new Date() > user.verificationCodeExpiresAt!) {
       throw new HttpException(
-        { message: 'Mã xác thực đã hết hạn' },
+        { message: { code: 'Mã xác thực đã hết hạn' } },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -200,25 +221,25 @@ export class AuthService {
 
     if (!user) {
       throw new HttpException(
-        { message: 'Account not found' },
+        { message: { email: 'Account not found' } },
         HttpStatus.UNAUTHORIZED,
       );
     }
     if (!user.isVerified) {
       throw new HttpException(
-        { message: 'Account is not verified' },
+        { message: { account: 'Account is not verified' } },
         HttpStatus.UNAUTHORIZED,
       );
     }
     if (!user.role) {
       throw new HttpException(
-        { message: 'User role not assigned' },
+        { message: { role: 'User role not assigned' } },
         HttpStatus.FORBIDDEN,
       );
     }
     if (!user.password) {
       throw new HttpException(
-        { message: 'Please use Google login for this account' },
+        { message: { account: 'Please use Google login for this account' } },
         HttpStatus.UNAUTHORIZED,
       );
     }
@@ -226,7 +247,7 @@ export class AuthService {
     const isPasswordValid = await compare(credentials.password, user.password);
     if (!isPasswordValid) {
       throw new HttpException(
-        { message: 'Password is not correct' },
+        { message: { password: 'Password is not correct' } },
         HttpStatus.UNAUTHORIZED,
       );
     }
@@ -289,7 +310,7 @@ export class AuthService {
     const user = await this.prismaService.user.findUnique({ where: { email } });
     if (!user) {
       throw new HttpException(
-        { message: `Email ${email} not found` },
+        { message: { email: `Email ${email} not found` } },
         HttpStatus.UNAUTHORIZED,
       );
     }
@@ -331,7 +352,7 @@ export class AuthService {
     });
     if (!user) {
       throw new HttpException(
-        { message: 'User not found' },
+        { message: { user: 'User not found' } },
         HttpStatus.NOT_FOUND,
       );
     }
@@ -345,7 +366,11 @@ export class AuthService {
     const isSamePassword = await compare(newPassword, currentPassword);
     if (isSamePassword) {
       throw new HttpException(
-        { message: 'New password cannot be the same as the old password' },
+        {
+          message: {
+            password: 'New password cannot be the same as the old password',
+          },
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -398,7 +423,7 @@ export class AuthService {
     );
     if (!isCurrentPasswordCorrect) {
       throw new HttpException(
-        { message: 'Current password is incorrect' },
+        { message: { password: 'Current password is incorrect' } },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -411,13 +436,21 @@ export class AuthService {
   ): Promise<void> {
     if (isEqual(currentPassword, newPassword)) {
       throw new HttpException(
-        { message: 'New password cannot be the same as the current password' },
+        {
+          message: {
+            password: 'New password cannot be the same as the current password',
+          },
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
     if (!isEqual(newPassword, confirmPassword)) {
       throw new HttpException(
-        { message: 'New password and confirm password do not match' },
+        {
+          message: {
+            confirmPassword: 'New password and confirm password do not match',
+          },
+        },
         HttpStatus.BAD_REQUEST,
       );
     }
