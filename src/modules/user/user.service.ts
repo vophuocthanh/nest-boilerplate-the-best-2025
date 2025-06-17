@@ -12,7 +12,7 @@ import { Prisma, User } from '@prisma/client';
 import { isEqual } from 'lodash';
 import { FileUploadService } from 'src/lib/file-upload.service';
 import { UpdateUserDto } from 'src/modules/user/dto/user.dto';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from '@app/src/helpers/prisma.service';
 import { ResponseFormat } from '../../types/response.interface';
 import { ResponseUtil } from '../../utils/response.util';
 

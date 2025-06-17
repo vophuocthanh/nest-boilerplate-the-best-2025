@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { MessagesGateway } from './messages.gateway';
 import { MessageService } from './messages.service';
 import { JwtModule } from '@nestjs/jwt';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from '@app/src/helpers/prisma.service';
 @Module({
   imports: [
     JwtModule.register({

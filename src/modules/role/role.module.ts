@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from '@app/src/helpers/prisma.service';
 import { RoleController } from './role.controller';
 import { RoleService } from './role.service';
 

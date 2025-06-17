@@ -4,7 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { FileUploadService } from 'src/lib/file-upload.service';
 import { UserModule } from 'src/modules/user/user.module';
 import { UserService } from 'src/modules/user/user.service';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from '@app/src/helpers/prisma.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { MailService } from '@app/src/modules/mail/mail.service';

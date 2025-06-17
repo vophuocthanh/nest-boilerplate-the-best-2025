@@ -13,7 +13,7 @@ import { RefreshTokenDto } from 'src/modules/auth/dto/refresh-token.dto';
 import { RegisterDto } from 'src/modules/auth/dto/register.dto';
 import { SendVerificationEmailDto } from 'src/modules/auth/dto/verify-code';
 import { UserService } from 'src/modules/user/user.service';
-import { PrismaService } from 'src/prisma.service';
+import { PrismaService } from '@app/src/helpers/prisma.service';
 import { ForgotPasswordDto } from '@app/src/modules/auth/dto/auth.dto';
 @Injectable()
 export class AuthService {
