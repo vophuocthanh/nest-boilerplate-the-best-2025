@@ -24,89 +24,126 @@ import { RefreshTokenDto } from 'src/modules/auth/dto/refresh-token.dto';
 import { RegisterDto } from 'src/modules/auth/dto/register.dto';
 import { VerifyEmailDto } from 'src/modules/auth/dto/verify-code';
 import { HandleAuthGuard } from 'src/modules/auth/guard/auth.guard';
+import { I18nService } from 'nestjs-i18n';
 
 @ApiBearerAuth()
-@ApiTags('Auth')
+@ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private i18n: I18nService,
+  ) {}
 
   @Post('register')
-  @ApiCommonResponses('Đăng ký tài khoản')
-  register(@Body() body: RegisterDto): Promise<{ message: string }> {
-    return this.authService.register(body);
+  @ApiCommonResponses('Register account')
+  async register(@Body() body: RegisterDto): Promise<{ message: string }> {
+    const result = await this.authService.register(body);
+    return {
+      ...result,
+      message: 'AUTH.REGISTER_SUCCESS',
+    };
   }
 
-  @ApiCommonResponses('Xác thực email')
+  @ApiCommonResponses('Verify email')
   @Post('verify-email')
   async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
-    return this.authService.verifyEmail(
+    const result = await this.authService.verifyEmail(
       verifyEmailDto.email,
       verifyEmailDto.verificationCode,
     );
+    return {
+      ...result,
+      message: 'SUCCESS.UPDATED',
+    };
   }
 
   @Post('login')
-  @ApiCommonResponses('Đăng nhập')
-  login(@Body() body: LoginDto): Promise<User> {
-    return this.authService.login(body);
+  @ApiCommonResponses('Login')
+  async login(@Body() body: LoginDto): Promise<any> {
+    const result = await this.authService.login(body);
+    return {
+      data: result,
+      message: 'AUTH.LOGIN_SUCCESS',
+    };
   }
 
   @Post('refresh-token')
-  @ApiCommonResponses('Lấy lại token')
+  @ApiCommonResponses('Refresh token')
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.refreshToken(refreshTokenDto);
   }
 
   @Post('forgot-password')
-  @ApiCommonResponses('Quên mật khẩu')
-  forgotPassword(@Body() body: ForgotPasswordDto): Promise<any> {
-    return this.authService.forgotPassword(body);
+  @ApiCommonResponses('Forgot password')
+  async forgotPassword(@Body() body: ForgotPasswordDto): Promise<any> {
+    const result = await this.authService.forgotPassword(body);
+    return {
+      ...result,
+      message: 'SUCCESS.UPDATED',
+    };
   }
 
   @UseGuards(HandleAuthGuard)
   @Put('reset-password')
-  @ApiCommonResponses('Reset mật khẩu')
+  @ApiCommonResponses('Reset password')
   async resetPassword(
     @CurrentUser() user: User,
     @Body() body: ResetPasswordDto,
   ): Promise<any> {
     const { newPassword } = body;
-    return this.authService.resetPassword(user, newPassword);
+    const result = await this.authService.resetPassword(user, newPassword);
+    return {
+      ...result,
+      message: 'SUCCESS.UPDATED',
+    };
   }
 
   @UseGuards(HandleAuthGuard)
-  @ApiCommonResponses('Thay đổi mật khẩu')
+  @ApiCommonResponses('Change password')
   @Put('change-password')
   async changePassword(
     @CurrentUser() user: User,
     @Body() body: ChangePasswordDto,
   ): Promise<any> {
     const { current_password, password, confirm_password } = body;
-    return this.authService.changePassword(
+    const result = await this.authService.changePassword(
       user,
       current_password,
       password,
       confirm_password,
     );
+    return {
+      ...result,
+      message: 'SUCCESS.UPDATED',
+    };
   }
+
   @Get('google')
   @UseGuards(AuthGuard('google'))
-  @ApiCommonResponses('Bắt đầu đăng nhập với Google')
+  @ApiCommonResponses('Start Google login')
   async googleAuth(@Request() req) {
     return req;
   }
 
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
-  @ApiCommonResponses('Xử lý callback đăng nhập Google')
+  @ApiCommonResponses('Handle Google login callback')
   async googleAuthCallback(@Request() req) {
-    return this.authService.googleLogin(req.user);
+    const result = await this.authService.googleLogin(req.user);
+    return {
+      ...result,
+      message: 'AUTH.LOGIN_SUCCESS',
+    };
   }
 
   @Post('resend-verification-email')
-  @ApiCommonResponses('Gửi lại email xác thực')
+  @ApiCommonResponses('Resend verification email')
   async resendVerificationEmail(@Body() body: ResendVerificationEmailDto) {
-    return this.authService.resendVerificationEmail(body.email);
+    const result = await this.authService.resendVerificationEmail(body.email);
+    return {
+      ...result,
+      message: 'SUCCESS.UPDATED',
+    };
   }
 }
