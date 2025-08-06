@@ -8,6 +8,7 @@ import {
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ApiResponse } from '../types/response.interface';
+import { HTTP_STATUS_MESSAGE } from '../constants/http-status.constant';
 
 @Injectable()
 export class ResponseInterceptor<T>
@@ -26,7 +27,7 @@ export class ResponseInterceptor<T>
           if (Object.keys(data).length === 1 && 'message' in data) {
             return {
               statusCode,
-              message: data.message,
+              message: this.getStatusMessage(statusCode, data.message),
               ...(Object.keys(data).filter((key) => key !== 'message').length >
               0
                 ? { data: data }
@@ -35,21 +36,37 @@ export class ResponseInterceptor<T>
           }
 
           if ('statusCode' in data) {
-            return data;
+            return {
+              ...data,
+              message: this.getStatusMessage(data.statusCode, data.message),
+            };
           }
 
           return {
             statusCode,
+            message: this.getStatusMessage(statusCode, data.message),
             ...data,
           };
         }
 
         return {
           statusCode,
-          message: 'Success',
+          message: this.getStatusMessage(statusCode),
           data,
         };
       }),
     );
+  }
+
+  private getStatusMessage(statusCode: number, customMessage?: string): string {
+    if (customMessage) {
+      return customMessage;
+    }
+
+    const statusEntry = Object.entries(HTTP_STATUS_MESSAGE).find(
+      ([, value]) => value.code === statusCode,
+    );
+
+    return statusEntry ? statusEntry[1].message : 'Thành công';
   }
 }
