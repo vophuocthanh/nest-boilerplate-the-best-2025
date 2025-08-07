@@ -1,14 +1,16 @@
+import { UseGuards } from '@nestjs/common';
 import {
-  WebSocketGateway,
-  WebSocketServer,
-  SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
+
 import { Server, Socket } from 'socket.io';
-import { MessageService } from './messages.service';
-import { UseGuards } from '@nestjs/common';
-import { WsJwtAuthGuard } from '../auth/guards/ws-jwt-auth.guard';
+
+import { WsJwtAuthGuard } from '@app/src/auth/guards/ws-jwt-auth.guard';
+import { MessageService } from '@app/src/modules/messages/messages.service';
 
 // Các events chính trong hệ thống:
 // sendMessage: Gửi tin nhắn mới

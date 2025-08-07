@@ -9,31 +9,29 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+
 import { User } from '@prisma/client';
-import { ApiCommonResponses } from 'src/decorator/api-common-responses.decorator';
-import { AuthService } from 'src/modules/auth/auth.service';
-import { CurrentUser } from 'src/modules/auth/decorator/current-user.decorator';
+
+import { ApiCommonResponses } from '@app/src/decorator/api-common-responses.decorator';
+import { AuthService } from '@app/src/modules/auth/auth.service';
+import { CurrentUser } from '@app/src/modules/auth/decorator/current-user.decorator';
 import {
   ChangePasswordDto,
   ForgotPasswordDto,
   ResendVerificationEmailDto,
   ResetPasswordDto,
-} from 'src/modules/auth/dto/auth.dto';
-import { LoginDto } from 'src/modules/auth/dto/login.dto';
-import { RefreshTokenDto } from 'src/modules/auth/dto/refresh-token.dto';
-import { RegisterDto } from 'src/modules/auth/dto/register.dto';
-import { VerifyEmailDto } from 'src/modules/auth/dto/verify-code';
-import { HandleAuthGuard } from 'src/modules/auth/guard/auth.guard';
-import { I18nService } from 'nestjs-i18n';
+} from '@app/src/modules/auth/dto/auth.dto';
+import { LoginDto } from '@app/src/modules/auth/dto/login.dto';
+import { RefreshTokenDto } from '@app/src/modules/auth/dto/refresh-token.dto';
+import { RegisterDto } from '@app/src/modules/auth/dto/register.dto';
+import { VerifyEmailDto } from '@app/src/modules/auth/dto/verify-code';
+import { HandleAuthGuard } from '@app/src/modules/auth/guard/auth.guard';
 
 @ApiBearerAuth()
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private authService: AuthService,
-    private i18n: I18nService,
-  ) {}
+  constructor(private authService: AuthService) {}
 
   @Post('register')
   @ApiCommonResponses('Register account')

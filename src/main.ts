@@ -1,10 +1,12 @@
-import { setupSwagger } from '@app/src/configs/swagger.config';
+import { ValidationPipe } from '@nestjs/common';
 import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
+
+import { setupSwagger } from '@app/src/configs/swagger.config';
+
 import { AppModule } from './app.module';
 import { loggerMiddleware } from './middlewares/logger.middleware';
-import { ValidationPipe } from '@nestjs/common';
 import { globalErrorHandler } from './middlewares/validation.middleware';
 
 const API_PREFIX = 'api';

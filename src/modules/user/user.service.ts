@@ -1,5 +1,3 @@
-import { PaginationParams } from '@app/src/core/model/pagination-params';
-import { Pagination } from '@app/src/decorator/pagination.decorator';
 import {
   BadRequestException,
   ForbiddenException,
@@ -8,11 +6,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+
 import { Prisma, User } from '@prisma/client';
+
 import { isEqual } from 'lodash';
 import { FileUploadService } from 'src/lib/file-upload.service';
 import { UpdateUserDto } from 'src/modules/user/dto/user.dto';
+
+import { PaginationParams } from '@app/src/core/model/pagination-params';
+import { Pagination } from '@app/src/decorator/pagination.decorator';
 import { PrismaService } from '@app/src/helpers/prisma.service';
+
 import { ResponseFormat } from '../../types/response.interface';
 import { ResponseUtil } from '../../utils/response.util';
 

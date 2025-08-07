@@ -5,16 +5,20 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+
 import { User } from '@prisma/client';
+
 import { compare, hash } from 'bcrypt';
 import { isEqual } from 'lodash';
-import { MailService } from '../mail/mail.service';
-import { RefreshTokenDto } from 'src/modules/auth/dto/refresh-token.dto';
-import { RegisterDto } from 'src/modules/auth/dto/register.dto';
-import { SendVerificationEmailDto } from 'src/modules/auth/dto/verify-code';
-import { UserService } from 'src/modules/user/user.service';
+
 import { PrismaService } from '@app/src/helpers/prisma.service';
 import { ForgotPasswordDto } from '@app/src/modules/auth/dto/auth.dto';
+import { RefreshTokenDto } from '@app/src/modules/auth/dto/refresh-token.dto';
+import { RegisterDto } from '@app/src/modules/auth/dto/register.dto';
+import { SendVerificationEmailDto } from '@app/src/modules/auth/dto/verify-code';
+import { MailService } from '@app/src/modules/mail/mail.service';
+import { UserService } from '@app/src/modules/user/user.service';
+
 @Injectable()
 export class AuthService {
   private static readonly CODE_LENGTH = 6;

@@ -1,6 +1,7 @@
 import { applyDecorators } from '@nestjs/common';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { HTTP_STATUS_MESSAGE } from '../constants/http-status.constant';
+
+import { HTTP_STATUS_MESSAGE } from '@app/src/constants/http-status.constant';
 
 /**
  * Decorator used to add API description (summary) and general responses

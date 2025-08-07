@@ -1,14 +1,16 @@
 import {
+  CallHandler,
+  ExecutionContext,
+  HttpStatus,
   Injectable,
   NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-  HttpStatus,
 } from '@nestjs/common';
+
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { ApiResponse } from '../types/response.interface';
-import { HTTP_STATUS_MESSAGE } from '../constants/http-status.constant';
+
+import { HTTP_STATUS_MESSAGE } from '@app/src/constants/http-status.constant';
+import { ApiResponse } from '@app/src/types/response.interface';
 
 @Injectable()
 export class ResponseInterceptor<T>

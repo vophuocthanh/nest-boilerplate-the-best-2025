@@ -6,14 +6,15 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
-import { UploadService } from './upload.service';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiConsumes,
   ApiBody,
+  ApiConsumes,
+  ApiOperation,
   ApiResponse,
+  ApiTags,
 } from '@nestjs/swagger';
+
+import { UploadService } from './upload.service';
 
 @ApiTags('File Upload')
 @Controller('upload')
