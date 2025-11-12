@@ -23,6 +23,10 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: 📝 Set short SHA
+        id: vars
+        run: echo "short_sha=$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_OUTPUT
+
       - name: 🏗️ Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -30,6 +34,6 @@ jobs:
           push: true
           tags: |
             vophuocthanh/nestjs-boilerplate-hihi:latest
-            vophuocthanh/nestjs-boilerplate-hihi:${{ github.sha }}
+            vophuocthanh/nestjs-boilerplate-hihi:${{ steps.vars.outputs.short_sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
