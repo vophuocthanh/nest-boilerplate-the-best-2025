@@ -1,12 +1,14 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
+
 import * as dotenv from 'dotenv';
 import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 dotenv.config();
 
