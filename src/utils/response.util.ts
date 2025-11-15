@@ -1,11 +1,11 @@
-import { ResponseFormat } from '../types/response.interface';
+import { PaginationResponse } from '@app/src/core/model/pagination-response';
 
 export class ResponseUtil {
   static success<T>(
     data: T,
     message: string = 'Success',
     status: number = 200,
-  ): ResponseFormat<T> {
+  ): PaginationResponse<T> {
     return {
       data,
       message,
@@ -19,7 +19,7 @@ export class ResponseUtil {
     currentPage: number,
     itemsPerPage: number,
     message: string = 'Success',
-  ): ResponseFormat<T[]> {
+  ): PaginationResponse<T[]> {
     const totalPages = Math.ceil(total / itemsPerPage);
     return {
       data,
@@ -35,7 +35,7 @@ export class ResponseUtil {
   static error(
     message: string = 'Error',
     status: number = 400,
-  ): ResponseFormat<null> {
+  ): PaginationResponse<null> {
     return {
       data: null,
       message,

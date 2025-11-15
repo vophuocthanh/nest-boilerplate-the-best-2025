@@ -13,11 +13,12 @@ import { isEqual } from 'lodash';
 import { FileUploadService } from 'src/lib/file-upload.service';
 import { UpdateUserDto } from 'src/modules/user/dto/user.dto';
 
+import { USER_SELECT } from '@app/src/configs/const';
 import { PaginationParams } from '@app/src/core/model/pagination-params';
+import { PaginationResponse } from '@app/src/core/model/pagination-response';
 import { Pagination } from '@app/src/decorator/pagination.decorator';
 import { PrismaService } from '@app/src/helpers/prisma.service';
 
-import { ResponseFormat } from '../../types/response.interface';
 import { ResponseUtil } from '../../utils/response.util';
 
 @Injectable()
@@ -28,7 +29,7 @@ export class UserService {
   ) {}
 
   async getAll(@Pagination() pagination: PaginationParams): Promise<any> {
-    const { itemsPerPage, skip, search, page } = pagination;
+    const { itemsPerPage, skip, search, page, sort, sortBy } = pagination;
     const where: Prisma.UserWhereInput = search
       ? {
           OR: [
@@ -38,30 +39,15 @@ export class UserService {
         }
       : {};
 
+    const orderBy: Prisma.UserOrderByWithRelationInput =
+      sort && sortBy ? { [sortBy]: sort } : { createAt: 'desc' };
+
     const users = await this.prismaService.user.findMany({
       where,
       skip,
       take: itemsPerPage,
-      select: {
-        id: true,
-        email: true,
-        phone: true,
-        address: true,
-        avatar: true,
-        name: true,
-        date_of_birth: true,
-        country: true,
-        createAt: true,
-        updateAt: true,
-        verificationCode: true,
-        verificationCodeExpiresAt: true,
-        isVerified: true,
-        role: {
-          select: {
-            name: true,
-          },
-        },
-      },
+      orderBy,
+      select: USER_SELECT,
     });
 
     const totalUsers = await this.prismaService.user.count({ where });
@@ -119,7 +105,7 @@ export class UserService {
     userId: string,
     roleId: string,
     currentUserId: string,
-  ): Promise<ResponseFormat<User>> {
+  ): Promise<PaginationResponse<User>> {
     if (userId === currentUserId) {
       throw new ForbiddenException('You cannot update your own role.');
     }

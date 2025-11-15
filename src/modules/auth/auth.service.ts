@@ -260,14 +260,14 @@ export class AuthService {
 
   private async generateTokens(
     user: any,
-  ): Promise<{ access_token: string; refresh_token: string }> {
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const payload = {
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role.name,
     };
-    const [access_token, refresh_token] = await Promise.all([
+    const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: process.env.ACCESS_TOKEN_KEY,
         expiresIn: '1d',
@@ -277,7 +277,7 @@ export class AuthService {
         expiresIn: '7d',
       }),
     ]);
-    return { access_token, refresh_token };
+    return { accessToken, refreshToken };
   }
 
   private formatUserResponse(user: any): any {
@@ -303,8 +303,8 @@ export class AuthService {
 
   async forgotPassword(data: ForgotPasswordDto): Promise<{ message: string }> {
     const user = await this.findUserByEmail(data.email);
-    const access_token = await this.createToken(user.id);
-    await this.sendResetPasswordEmail(data.email, access_token);
+    const accessToken = await this.createToken(user.id);
+    await this.sendResetPasswordEmail(data.email, accessToken);
     return {
       message: 'Password reset instructions have been sent to your email.',
     };
@@ -323,14 +323,14 @@ export class AuthService {
 
   private async sendResetPasswordEmail(
     email: string,
-    access_token: string,
+    accessToken: string,
   ): Promise<void> {
     await this.mailService.sendMail({
       to: email,
       subject: 'Reset mật khẩu',
       template: 'reset-password',
       context: {
-        resetToken: access_token,
+        resetToken: accessToken,
       },
     });
   }
@@ -462,19 +462,19 @@ export class AuthService {
 
   async refreshToken(
     refreshTokenDto: RefreshTokenDto,
-  ): Promise<{ access_token: string }> {
+  ): Promise<{ accessToken: string }> {
     const userId = await this.validateRefreshToken(
-      refreshTokenDto.refresh_token,
+      refreshTokenDto.refreshToken,
     );
     if (!userId) {
       throw new UnauthorizedException('Invalid refresh token');
     }
     const user = await this.userService.getDetail(userId);
-    const access_token = this.jwtService.sign({
+    const accessToken = this.jwtService.sign({
       id: user.id,
       email: user.email,
     });
-    return { access_token };
+    return { accessToken };
   }
 
   private async validateRefreshToken(token: string): Promise<string | null> {

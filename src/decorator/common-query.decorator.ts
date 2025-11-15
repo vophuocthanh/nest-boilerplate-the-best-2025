@@ -1,12 +1,16 @@
 import { applyDecorators } from '@nestjs/common';
 import { ApiQuery } from '@nestjs/swagger';
 
-export function CommonQuery(name: string, description: string) {
+export function CommonQuery(
+  name: string,
+  description: string,
+  enumValues?: string[],
+) {
   return applyDecorators(
     ApiQuery({
       name: name,
       required: false,
-      enum: ['asc', 'desc'],
+      enum: enumValues,
       description: description,
     }),
   );

@@ -5,18 +5,8 @@ export interface PaginationMeta {
   totalPages?: number;
 }
 
-export interface ResponseFormat<T> {
-  data: T;
-  total?: number;
-  currentPage?: number;
-  itemsPerPage?: number;
-  totalPages?: number;
-  message?: string;
-  status?: number;
-}
-
 /**
- * Interface chuẩn cho phản hồi API thành công
+ * Interface for API response
  */
 export interface ApiResponse<T> {
   statusCode: number;
@@ -26,7 +16,7 @@ export interface ApiResponse<T> {
 }
 
 /**
- * Hàm tạo phản hồi thành công
+ * Function to create a success response
  */
 export function createSuccessResponse<T>(
   data?: T,
@@ -40,7 +30,7 @@ export function createSuccessResponse<T>(
 }
 
 /**
- * Hàm tạo phản hồi lỗi
+ * Function to create an error response
  */
 export function createErrorResponse(
   statusCode: number = 400,

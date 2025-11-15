@@ -1,6 +1,7 @@
-import { ResponseFormat } from '@app/src/types/response.interface';
 import { ApiProperty } from '@nestjs/swagger';
+
 import { User } from '@prisma/client';
+
 import {
   IsEmail,
   IsNotEmpty,
@@ -8,6 +9,8 @@ import {
   Matches,
   MinLength,
 } from 'class-validator';
+
+import { PaginationResponse } from '@app/src/core/model/pagination-response';
 
 export class CreateUserDto {
   @IsNotEmpty()
@@ -59,4 +62,4 @@ export class UpdateUserRoleDto {
   roleId: string;
 }
 
-export type UserPaginationResponse = ResponseFormat<User[]>;
+export type UserPaginationResponse = PaginationResponse<User[]>;

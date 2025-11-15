@@ -1,7 +1,3 @@
-import { PaginationParams } from '@app/src/core/model/pagination-params';
-import { Pagination } from '@app/src/decorator/pagination.decorator';
-import { HandleAuthGuard } from '@app/src/modules/auth/guard/auth.guard';
-import { UserService } from '@app/src/modules/user/user.service';
 import {
   BadRequestException,
   Body,
@@ -17,7 +13,9 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+
 import { User } from '@prisma/client';
+
 import { ApiCommonResponses } from 'src/decorator/api-common-responses.decorator';
 import { CommonPagination } from 'src/decorator/common-pagination.decorator';
 import { CurrentUserId } from 'src/decorator/current-user-id.decorator';
@@ -28,6 +26,12 @@ import {
   UpdateUserRoleDto,
   UserPaginationResponse,
 } from 'src/modules/user/dto/user.dto';
+
+import { PaginationParams } from '@app/src/core/model/pagination-params';
+import { CommonQuery } from '@app/src/decorator/common-query.decorator';
+import { Pagination } from '@app/src/decorator/pagination.decorator';
+import { HandleAuthGuard } from '@app/src/modules/auth/guard/auth.guard';
+import { UserService } from '@app/src/modules/user/user.service';
 
 @ApiBearerAuth()
 @ApiTags('User')
@@ -52,6 +56,8 @@ export class UserController {
   }
 
   @UseGuards(HandleAuthGuard)
+  @CommonQuery('sort', 'Sort order (asc or desc)', ['asc', 'desc'])
+  @CommonQuery('sortBy', 'Field to sort by', ['createAt'])
   @Get()
   @ApiCommonResponses('Lấy ra danh sách user')
   @CommonPagination()

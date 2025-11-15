@@ -1,4 +1,3 @@
-# Base image
 FROM node:18-alpine AS builder
 
 # Set working directory
@@ -7,7 +6,7 @@ WORKDIR /app
 # Install build dependencies
 RUN apk add --no-cache python3 make g++
 
-# Copy package files
+# Copy package.json
 COPY package*.json ./
 
 # Install dependencies
@@ -22,7 +21,9 @@ RUN npx prisma generate
 # Build application
 RUN npm run build
 
-# Production image
+################################################################################
+# PRODUCTION IMAGE
+
 FROM node:18-alpine
 
 # Set working directory
