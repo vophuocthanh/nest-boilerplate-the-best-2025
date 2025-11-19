@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Body,
-  Controller,
   Delete,
   Get,
   Param,
@@ -12,11 +11,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 
 import { User } from '@prisma/client';
 
 import { ApiCommonResponses } from 'src/decorator/api-common-responses.decorator';
+import { AuthenticatedController } from 'src/decorator/authenticated-controller.decorator';
 import { CommonPagination } from 'src/decorator/common-pagination.decorator';
 import { CurrentUserId } from 'src/decorator/current-user-id.decorator';
 import { Roles } from 'src/decorator/roles.decorator';
@@ -33,9 +33,8 @@ import { Pagination } from '@app/src/decorator/pagination.decorator';
 import { HandleAuthGuard } from '@app/src/modules/auth/guard/auth.guard';
 import { UserService } from '@app/src/modules/user/user.service';
 
-@ApiBearerAuth()
 @ApiTags('User')
-@Controller('user')
+@AuthenticatedController('user')
 export class UserController {
   constructor(private userService: UserService) {}
 

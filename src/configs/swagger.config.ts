@@ -17,5 +17,8 @@ export const setupSwagger = (app: NestExpressApplication): void => {
   const document = SwaggerModule.createDocument(app, config.build());
   SwaggerModule.setup(SWAGGER_PATH, app, document, {
     customSiteTitle: `Swagger | ${APP_TITLE}`,
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
   });
 };
