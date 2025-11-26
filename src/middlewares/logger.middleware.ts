@@ -1,321 +1,83 @@
 import { NextFunction, Request, Response } from 'express';
 
-import { ValidationFieldError } from './validation.middleware';
-
-/**
- * Middleware ghi log request API với giao diện đẹp trong terminal
- */
 export const loggerMiddleware = (
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
   const start = Date.now();
+  const { method, originalUrl, ip } = req;
 
-  // Lưu method và URL gốc
-  const { method, originalUrl, ip, headers } = req;
-
-  // Thiết lập màu và icon dựa trên phương thức HTTP
-  let methodColor: string;
-  let methodIcon: string;
-  switch (method) {
-    case 'GET':
-      methodColor = '\x1b[32m'; // Màu xanh lá
-      methodIcon = '📋';
-      break;
-    case 'POST':
-      methodColor = '\x1b[33m'; // Màu vàng
-      methodIcon = '➕';
-      break;
-    case 'PUT':
-      methodColor = '\x1b[34m'; // Màu xanh dương
-      methodIcon = '📝';
-      break;
-    case 'DELETE':
-      methodColor = '\x1b[31m'; // Màu đỏ
-      methodIcon = '🗑️';
-      break;
-    case 'PATCH':
-      methodColor = '\x1b[35m'; // Màu tím
-      methodIcon = '🔄';
-      break;
-    default:
-      methodColor = '\x1b[37m'; // Màu trắng
-      methodIcon = '⚡';
-  }
-
-  // Màu và định dạng
+  // Colors
   const resetColor = '\x1b[0m';
-  const brightWhite = '\x1b[1;37m';
-  const dim = '\x1b[2m';
-  const bold = '\x1b[1m';
-  const underline = '\x1b[4m';
-  const bgBlack = '\x1b[40m';
+  const dimColor = '\x1b[2m';
+  const cyanColor = '\x1b[36m';
+  const orangeColor = '\x1b[38;5;208m'; // Orange color
 
-  // Định dạng khung
-  const boxTopLeft = '┌';
-  const boxTopRight = '┐';
-  const boxBottomLeft = '└';
-  const boxBottomRight = '┘';
-  const boxHorizontal = '─';
-  const boxVertical = '│';
-  const boxLeftT = '├';
-  const boxRightT = '┤';
-
-  // Lấy timestamp đẹp hơn
-  const now = new Date();
-  const timestamp = now.toLocaleTimeString();
-  const date = now.toLocaleDateString();
-
-  // Tạo ID request duy nhất để dễ theo dõi
-  const requestId = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-  // Lấy User-Agent
-  const userAgent = headers['user-agent'] || 'Unknown';
-  const referer = headers['referer'] || '-';
-
-  // Chiều rộng của box
-  const boxWidth = 100;
-
-  // Tạo khung trên
-  console.log(
-    `${dim}${boxTopLeft}${boxHorizontal.repeat(boxWidth - 2)}${boxTopRight}${resetColor}`,
-  );
-
-  // Tiêu đề request
-  console.log(
-    `${dim}${boxVertical}${resetColor} ${bgBlack}${brightWhite}${bold} REQUEST ${requestId} ${resetColor}${dim}${' '.repeat(boxWidth - 15)}${boxVertical}${resetColor}`,
-  );
-
-  // Vạch ngăn
-  console.log(
-    `${dim}${boxLeftT}${boxHorizontal.repeat(boxWidth - 2)}${boxRightT}${resetColor}`,
-  );
-
-  // Hiển thị thông tin cơ bản
-  const timeInfo = `${dim}${boxVertical}${resetColor} ${underline}Time${resetColor}     : ${brightWhite}${date} ${timestamp}${resetColor}`;
-  console.log(
-    `${timeInfo}${' '.repeat(boxWidth - timeInfo.length + dim.length + resetColor.length * 2)}${dim}${boxVertical}${resetColor}`,
-  );
-
-  const methodInfo = `${dim}${boxVertical}${resetColor} ${underline}Method${resetColor}   : ${methodIcon}  ${methodColor}${method.padEnd(7)}${resetColor}`;
-  console.log(
-    `${methodInfo}${' '.repeat(boxWidth - methodInfo.length + dim.length + resetColor.length * 2 + methodColor.length)}${dim}${boxVertical}${resetColor}`,
-  );
-
-  const pathInfo = `${dim}${boxVertical}${resetColor} ${underline}Path${resetColor}     : ${brightWhite}${originalUrl}${resetColor}`;
-  const pathPadding = Math.max(
-    0,
-    boxWidth -
-      pathInfo.length +
-      dim.length +
-      resetColor.length * 2 +
-      brightWhite.length,
-  );
-  console.log(
-    `${pathInfo}${' '.repeat(pathPadding)}${dim}${boxVertical}${resetColor}`,
-  );
-
-  const ipInfo = `${dim}${boxVertical}${resetColor} ${underline}IP${resetColor}       : ${ip}`;
-  console.log(
-    `${ipInfo}${' '.repeat(boxWidth - ipInfo.length + dim.length + resetColor.length)}${dim}${boxVertical}${resetColor}`,
-  );
-
-  // Body info nếu có
-  if (method === 'POST' || method === 'PUT' || method === 'PATCH') {
-    try {
-      const bodyInfo = `${dim}${boxVertical}${resetColor} ${underline}Body${resetColor}     : ${JSON.stringify(req.body).substring(0, 70)}${req.body && JSON.stringify(req.body).length > 70 ? '...' : ''}`;
-      const bodyPadding = Math.max(
-        0,
-        boxWidth - bodyInfo.length + dim.length + resetColor.length * 2,
-      );
-      console.log(
-        `${bodyInfo}${' '.repeat(bodyPadding)}${dim}${boxVertical}${resetColor}`,
-      );
-    } catch (e) {
-      // Bỏ qua nếu không thể hiển thị body
+  const getMethodColor = (method: string): string => {
+    switch (method) {
+      case 'GET':
+        return '\x1b[32m'; // Green
+      case 'POST':
+        return '\x1b[33m'; // Yellow
+      case 'PUT':
+        return '\x1b[34m'; // Blue
+      case 'DELETE':
+        return '\x1b[31m'; // Red
+      case 'PATCH':
+        return '\x1b[35m'; // Purple
+      default:
+        return '\x1b[37m'; // White
     }
-  }
+  };
 
-  // Hiển thị User-Agent
-  const uaShort =
-    userAgent.length > 70 ? userAgent.substring(0, 67) + '...' : userAgent;
-  const uaInfo = `${dim}${boxVertical}${resetColor} ${underline}Agent${resetColor}    : ${uaShort}`;
-  const uaPadding = Math.max(
-    0,
-    boxWidth - uaInfo.length + dim.length + resetColor.length * 2,
-  );
+  const getStatusColor = (statusCode: number): string => {
+    if (statusCode < 300) return '\x1b[32m'; // Green
+    if (statusCode < 400) return '\x1b[33m'; // Yellow
+    if (statusCode < 500) return '\x1b[31m'; // Red
+    return '\x1b[31m'; // Red
+  };
+
+  const formatTimestamp = (): string => {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    const date = `${day}/${month}/${year}`;
+    const time = now.toLocaleTimeString('en-US', {
+      hour12: true,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+    return `${date}, ${time}`;
+  };
+
+  // Log request
+  const methodColor = getMethodColor(method);
+  const timestamp = formatTimestamp();
+  const logLevel = cyanColor + 'LOG REQUEST' + resetColor;
+
   console.log(
-    `${uaInfo}${' '.repeat(uaPadding)}${dim}${boxVertical}${resetColor}`,
+    `${dimColor}[${logLevel}]${resetColor} ${dimColor}${timestamp}${resetColor} ${methodColor}${method.padEnd(6)}${resetColor} ${originalUrl} ${dimColor}${ip}${resetColor} ${dimColor}${timestamp}${resetColor}`,
   );
 
-  // Hiển thị Referer nếu có
-  if (referer !== '-') {
-    const refShort =
-      referer.length > 70 ? referer.substring(0, 67) + '...' : referer;
-    const refInfo = `${dim}${boxVertical}${resetColor} ${underline}Referer${resetColor}  : ${refShort}`;
-    const refPadding = Math.max(
-      0,
-      boxWidth - refInfo.length + dim.length + resetColor.length * 2,
-    );
-    console.log(
-      `${refInfo}${' '.repeat(refPadding)}${dim}${boxVertical}${resetColor}`,
-    );
-  }
-
-  // Sao lưu các phương thức nguyên bản
-  const originalSend = res.send;
-  const originalJson = res.json;
-
-  // Ghi đè phương thức json để bắt response
-  res.json = function (body) {
-    (res as any).responseBody = body;
-    return originalJson.call(this, body);
-  };
-
-  // Ghi đè phương thức send để bắt response
-  res.send = function (body) {
-    (res as any).responseBody = body;
-    return originalSend.call(this, body);
-  };
-
-  // Lắng nghe sự kiện kết thúc để log thời gian phản hồi
+  // Log response when finished
   res.on('finish', () => {
     const duration = Date.now() - start;
     const statusCode = res.statusCode;
-    const contentLength = res.getHeader('content-length') || '-';
-    const contentType = res.getHeader('content-type') || '-';
+    const statusColor = getStatusColor(statusCode);
+    const timeColor =
+      duration < 100 ? '\x1b[32m' : duration < 500 ? orangeColor : '\x1b[31m';
+    const responseTimestamp = formatTimestamp();
+    const responseLogLevel = cyanColor + 'LOG RESPONSE' + resetColor;
 
-    // Lấy body response nếu có
-    const responseBody = (res as any).responseBody;
+    const timingPrefix = duration >= 100 ? '+' : '';
+    const timingDisplay = `${timeColor}${timingPrefix}${duration}ms${resetColor}`;
 
-    // Màu cho status code và trạng thái
-    let statusColor: string;
-    let statusIcon: string;
-    let statusText: string;
-
-    if (statusCode < 300) {
-      statusColor = '\x1b[32m'; // Màu xanh lá cho thành công
-      statusIcon = '✅';
-      statusText = 'SUCCESS';
-    } else if (statusCode < 400) {
-      statusColor = '\x1b[33m'; // Màu vàng cho chuyển hướng
-      statusIcon = '↪️';
-      statusText = 'REDIRECT';
-    } else if (statusCode < 500) {
-      statusColor = '\x1b[31m'; // Màu đỏ cho lỗi client
-      statusIcon = '❌';
-      statusText = 'CLIENT ERROR';
-    } else {
-      statusColor = '\x1b[41m\x1b[37m'; // Nền đỏ, chữ trắng cho lỗi server
-      statusIcon = '💥';
-      statusText = 'SERVER ERROR';
-    }
-
-    // Màu cho thời gian phản hồi
-    const responseTime =
-      duration < 100 ? '\x1b[32m' : duration < 500 ? '\x1b[33m' : '\x1b[31m';
-
-    // Vạch ngăn kết quả
     console.log(
-      `${dim}${boxLeftT}${boxHorizontal.repeat(boxWidth - 2)}${boxRightT}${resetColor}`,
+      `${dimColor}[${responseLogLevel}]${resetColor} ${dimColor}${responseTimestamp}${resetColor} ${statusColor}${statusCode}${resetColor} ${methodColor}${method.padEnd(6)}${resetColor} ${originalUrl} ${timingDisplay} ${dimColor}${responseTimestamp}${resetColor}`,
     );
-
-    // Hiển thị RESPONSE
-    const resultHeader = `${dim}${boxVertical}${resetColor} ${bgBlack}${brightWhite}${bold} RESPONSE ${resetColor} ${statusIcon} ${statusColor}${bold}${statusText}${resetColor}`;
-    console.log(
-      `${resultHeader}${' '.repeat(boxWidth - resultHeader.length + dim.length + resetColor.length * 2 + statusColor.length + bold.length)}${dim}${boxVertical}${resetColor}`,
-    );
-
-    // Vạch ngăn
-    console.log(
-      `${dim}${boxLeftT}${boxHorizontal.repeat(boxWidth - 2)}${boxRightT}${resetColor}`,
-    );
-
-    // Hiển thị thông tin response
-    const statusInfo = `${dim}${boxVertical}${resetColor} ${underline}Status${resetColor}   : ${statusColor}${statusCode}${resetColor} ${statusIcon}`;
-    console.log(
-      `${statusInfo}${' '.repeat(boxWidth - statusInfo.length + dim.length + resetColor.length * 2 + statusColor.length)}${dim}${boxVertical}${resetColor}`,
-    );
-
-    const timeInfo = `${dim}${boxVertical}${resetColor} ${underline}Time${resetColor}     : ${responseTime}${duration}ms${resetColor}`;
-    console.log(
-      `${timeInfo}${' '.repeat(boxWidth - timeInfo.length + dim.length + resetColor.length * 2 + responseTime.length)}${dim}${boxVertical}${resetColor}`,
-    );
-
-    const sizeInfo = `${dim}${boxVertical}${resetColor} ${underline}Size${resetColor}     : ${contentLength} bytes`;
-    console.log(
-      `${sizeInfo}${' '.repeat(boxWidth - sizeInfo.length + dim.length + resetColor.length)}${dim}${boxVertical}${resetColor}`,
-    );
-
-    const typeInfo = `${dim}${boxVertical}${resetColor} ${underline}Type${resetColor}     : ${contentType}`;
-    const typePadding = Math.max(
-      0,
-      boxWidth - typeInfo.length + dim.length + resetColor.length,
-    );
-    console.log(
-      `${typeInfo}${' '.repeat(typePadding)}${dim}${boxVertical}${resetColor}`,
-    );
-
-    // Hiển thị lỗi validation từ request nếu có (được lưu từ middleware validation)
-    let validationErrors: ValidationFieldError[] = [];
-
-    // Lấy thông tin lỗi validation từ request nếu có
-    if ((req as any).validationErrors) {
-      validationErrors = (req as any).validationErrors;
-    }
-    // Hoặc từ response nếu có
-    else if (
-      responseBody &&
-      responseBody.message &&
-      typeof responseBody.message === 'object'
-    ) {
-      // Chuyển đổi từ object sang mảng để hiển thị
-      Object.keys(responseBody.message).forEach((field) => {
-        validationErrors.push({
-          field,
-          message: responseBody.message[field],
-        });
-      });
-    }
-
-    // Nếu có lỗi validation, hiển thị chi tiết
-    if (validationErrors.length > 0) {
-      // Vạch ngăn trước khi hiển thị lỗi validation
-      console.log(
-        `${dim}${boxLeftT}${boxHorizontal.repeat(boxWidth - 2)}${boxRightT}${resetColor}`,
-      );
-
-      // Tiêu đề validation
-      const validationTitle = `${dim}${boxVertical}${resetColor} ${bgBlack}${brightWhite}${bold} VALIDATION ERRORS ${resetColor}`;
-      console.log(
-        `${validationTitle}${' '.repeat(boxWidth - validationTitle.length + dim.length + resetColor.length * 2)}${dim}${boxVertical}${resetColor}`,
-      );
-
-      // Hiển thị từng lỗi validation
-      validationErrors.forEach((error: ValidationFieldError) => {
-        const errorLine = `${dim}${boxVertical}${resetColor} ${underline}${error.field}${resetColor}: ${'\x1b[31m'}${error.message}${resetColor}`;
-        const errorPadding = Math.max(
-          0,
-          boxWidth -
-            errorLine.length +
-            dim.length +
-            resetColor.length * 3 +
-            underline.length,
-        );
-        console.log(
-          `${errorLine}${' '.repeat(errorPadding)}${dim}${boxVertical}${resetColor}`,
-        );
-      });
-    }
-
-    // Khung dưới
-    console.log(
-      `${dim}${boxBottomLeft}${boxHorizontal.repeat(boxWidth - 2)}${boxBottomRight}${resetColor}`,
-    );
-
-    // Thêm dòng trống để dễ đọc
-    console.log('');
   });
 
   next();

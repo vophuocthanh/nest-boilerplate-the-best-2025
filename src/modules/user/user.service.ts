@@ -28,7 +28,9 @@ export class UserService {
     private fileUploadService: FileUploadService,
   ) {}
 
-  async getAll(@Pagination() pagination: PaginationParams): Promise<any> {
+  async getAll(
+    @Pagination(['sortBy']) pagination: PaginationParams,
+  ): Promise<any> {
     const { itemsPerPage, skip, search, page, sort, sortBy } = pagination;
     const where: Prisma.UserWhereInput = search
       ? {
@@ -40,7 +42,7 @@ export class UserService {
       : {};
 
     const orderBy: Prisma.UserOrderByWithRelationInput =
-      sort && sortBy ? { [sortBy]: sort } : { createAt: 'desc' };
+      sort && sortBy ? { [sortBy as string]: sort } : { createAt: 'desc' };
 
     const users = await this.prismaService.user.findMany({
       where,

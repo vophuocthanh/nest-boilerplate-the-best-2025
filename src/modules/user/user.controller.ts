@@ -61,7 +61,7 @@ export class UserController {
   @ApiCommonResponses('Lấy ra danh sách user')
   @CommonPagination()
   getAll(
-    @Pagination() params: PaginationParams,
+    @Pagination(['sortBy']) params: PaginationParams,
   ): Promise<UserPaginationResponse> {
     return this.userService.getAll(params);
   }

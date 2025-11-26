@@ -1,10 +1,11 @@
 export type SortOrder = 'asc' | 'desc';
 
-export interface PaginationParams {
+export interface BasePaginationParams {
   itemsPerPage: number;
   page: number;
   skip: number;
   search: string;
   sort?: SortOrder;
-  sortBy?: string;
 }
+
+export type PaginationParams = BasePaginationParams & Record<string, unknown>;
