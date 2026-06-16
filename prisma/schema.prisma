@@ -1,5 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // native: máy dev (macOS/linux). musl openssl-3.0.x: image alpine (cả arm64 lẫn x64) cho Docker.
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 generator dbml {
@@ -32,11 +34,32 @@ model User {
   role                      Role?     @relation(fields: [roleId], references: [id])
   points                    Int?      @default(0)
 
+  // Reset password (token được hash trước khi lưu, kèm thời hạn dùng 1 lần)
+  resetToken          String?
+  resetTokenExpiresAt DateTime?
+
   // Message relations
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
 
+  // Refresh token sessions (rotation + revoke)
+  refreshTokens RefreshToken[]
+
   @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  // Lưu hash của refresh token, không lưu token thô
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }
 
 model Role {

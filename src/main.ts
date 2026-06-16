@@ -3,6 +3,8 @@ import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.int
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
+import helmet from 'helmet';
+
 import { setupSwagger } from '@app/src/configs/swagger.config';
 
 import { AppModule } from './app.module';
@@ -10,18 +12,38 @@ import { loggerMiddleware } from './middlewares/logger.middleware';
 import { globalErrorHandler } from './middlewares/validation.middleware';
 
 const API_PREFIX = 'api';
-const PORT = 3001;
+const PORT = Number(process.env.PORT) || 3001;
 
-const CORS_OPTIONS: CorsOptions = {
-  origin: '*',
-  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-  credentials: true,
-};
+/**
+ * Danh sách origin được phép.
+ * - Production: chỉ cho phép các origin khai báo trong env CORS_ORIGIN (ngăn cách bằng dấu phẩy).
+ * - Dev: cho phép tất cả để tiện debug.
+ */
+function buildCorsOptions(): CorsOptions {
+  const isProduction = process.env.NODE_ENV === 'production';
+  const whitelist = (process.env.CORS_ORIGIN ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return {
+    origin: isProduction ? (whitelist.length ? whitelist : false) : true,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  };
+}
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.setGlobalPrefix(API_PREFIX);
-  app.enableCors(CORS_OPTIONS);
+
+  // Security headers
+  app.use(helmet());
+  app.enableCors(buildCorsOptions());
+
+  // Đóng kết nối (Prisma, ...) an toàn khi nhận SIGTERM/SIGINT
+  app.enableShutdownHooks();
+
   setupSwagger(app);
 
   app.useGlobalPipes(
@@ -39,8 +61,6 @@ async function bootstrap() {
       },
     }),
   );
-
-  // app.useGlobalInterceptors(new ResponseInterceptor());
 
   app.use(loggerMiddleware);
   app.use(globalErrorHandler);

@@ -5,7 +5,7 @@ export const AuthenticatedController = (
   path?: string | string[],
 ): ClassDecorator =>
   applyDecorators(
-    Controller(path),
+    path === undefined ? Controller() : Controller(path),
     ApiBearerAuth(),
     ApiUnauthorizedResponse({ description: 'Unauthorized' }),
   );

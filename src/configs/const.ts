@@ -20,8 +20,6 @@ export const USER_SELECT = {
   country: true,
   createAt: true,
   updateAt: true,
-  verificationCode: true,
-  verificationCodeExpiresAt: true,
   isVerified: true,
   role: {
     select: {

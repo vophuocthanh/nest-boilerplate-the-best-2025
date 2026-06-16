@@ -9,15 +9,21 @@ import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
 
 import { compare, hash } from 'bcrypt';
-import { isEqual } from 'lodash';
+import { createHash, randomBytes } from 'crypto';
 
 import { PrismaService } from '@app/src/helpers/prisma.service';
 import { ForgotPasswordDto } from '@app/src/modules/auth/dto/auth.dto';
 import { RefreshTokenDto } from '@app/src/modules/auth/dto/refresh-token.dto';
 import { RegisterDto } from '@app/src/modules/auth/dto/register.dto';
 import { SendVerificationEmailDto } from '@app/src/modules/auth/dto/verify-code';
+import {
+  AuthResult,
+  AuthTokens,
+  JwtPayload,
+  SafeUser,
+  UserWithRole,
+} from '@app/src/modules/auth/types/auth.types';
 import { MailService } from '@app/src/modules/mail/mail.service';
-import { UserService } from '@app/src/modules/user/user.service';
 
 @Injectable()
 export class AuthService {
@@ -25,11 +31,17 @@ export class AuthService {
   private static readonly EXPIRATION_MINUTES = 5;
   private static readonly DEFAULT_ROLE = 'USER';
   private static readonly BCRYPT_SALT_ROUNDS = 10;
+  private static readonly REFRESH_TOKEN_TTL_DAYS = 7;
+  private static readonly RESET_TOKEN_TTL_MINUTES = 60;
+
+  /** Hash token (SHA-256) trước khi lưu DB để có thể tra cứu chính xác mà không lưu token thô */
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
 
   constructor(
     private prismaService: PrismaService,
     private jwtService: JwtService,
-    private userService: UserService,
     private mailService: MailService,
   ) {}
 
@@ -109,7 +121,7 @@ export class AuthService {
       );
     }
 
-    if (!isEqual(userData.password, userData.confirmPassword)) {
+    if (userData.password !== userData.confirmPassword) {
       throw new HttpException(
         {
           message: {
@@ -145,7 +157,6 @@ export class AuthService {
       data: {
         email: userData.email,
         password: hashedPassword,
-        confirmPassword: hashedPassword,
         name: userData.name,
         verificationCode: verificationData.code,
         verificationCodeExpiresAt: verificationData.expiresAt,
@@ -183,7 +194,7 @@ export class AuthService {
     user: User,
     code: string,
   ): Promise<void> {
-    if (!isEqual(user.verificationCode, code)) {
+    if (user.verificationCode !== code) {
       throw new HttpException(
         { message: { code: 'Mã xác thực không đúng' } },
         HttpStatus.BAD_REQUEST,
@@ -208,7 +219,10 @@ export class AuthService {
     });
   }
 
-  async login(credentials: { email: string; password: string }): Promise<any> {
+  async login(credentials: {
+    email: string;
+    password: string;
+  }): Promise<AuthResult> {
     const user = await this.findAndValidateUser(credentials);
     const tokens = await this.generateTokens(user);
     return { ...tokens, user: this.formatUserResponse(user) };
@@ -217,7 +231,7 @@ export class AuthService {
   private async findAndValidateUser(credentials: {
     email: string;
     password: string;
-  }): Promise<User & { role: { name: string } }> {
+  }): Promise<UserWithRole> {
     const user = await this.prismaService.user.findUnique({
       where: { email: credentials.email },
       include: { role: true },
@@ -255,13 +269,12 @@ export class AuthService {
         HttpStatus.UNAUTHORIZED,
       );
     }
-    return user;
+    // role đã được đảm bảo non-null qua check phía trên
+    return user as UserWithRole;
   }
 
-  private async generateTokens(
-    user: any,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
-    const payload = {
+  private async generateTokens(user: UserWithRole): Promise<AuthTokens> {
+    const payload: JwtPayload = {
       id: user.id,
       name: user.name,
       email: user.email,
@@ -277,10 +290,27 @@ export class AuthService {
         expiresIn: '7d',
       }),
     ]);
+    await this.persistRefreshToken(user.id, refreshToken);
     return { accessToken, refreshToken };
   }
 
-  private formatUserResponse(user: any): any {
+  /** Lưu hash của refresh token vào DB để hỗ trợ rotation + revoke */
+  private async persistRefreshToken(
+    userId: string,
+    refreshToken: string,
+  ): Promise<void> {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + AuthService.REFRESH_TOKEN_TTL_DAYS);
+    await this.prismaService.refreshToken.create({
+      data: {
+        tokenHash: this.hashToken(refreshToken),
+        userId,
+        expiresAt,
+      },
+    });
+  }
+
+  private formatUserResponse(user: UserWithRole): SafeUser {
     return {
       id: user.id,
       name: user.name,
@@ -289,22 +319,26 @@ export class AuthService {
     };
   }
 
-  async createToken(id: string): Promise<string> {
-    if (!process.env.ACCESS_TOKEN_KEY) {
-      throw new Error(
-        'Access token secret key not found in environment variables.',
-      );
-    }
-    return this.jwtService.sign(
-      { id },
-      { expiresIn: '7d', secret: process.env.ACCESS_TOKEN_KEY },
-    );
-  }
-
   async forgotPassword(data: ForgotPasswordDto): Promise<{ message: string }> {
     const user = await this.findUserByEmail(data.email);
-    const accessToken = await this.createToken(user.id);
-    await this.sendResetPasswordEmail(data.email, accessToken);
+
+    // Token reset ngẫu nhiên, dùng 1 lần, hết hạn sau RESET_TOKEN_TTL_MINUTES
+    const resetToken = randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setMinutes(
+      expiresAt.getMinutes() + AuthService.RESET_TOKEN_TTL_MINUTES,
+    );
+
+    await this.prismaService.user.update({
+      where: { id: user.id },
+      data: {
+        resetToken: this.hashToken(resetToken),
+        resetTokenExpiresAt: expiresAt,
+      },
+    });
+
+    // Email gửi token thô; FE ghép với URL_RESET_PASSWORD để tạo link reset
+    await this.sendResetPasswordEmail(data.email, resetToken);
     return {
       message: 'Password reset instructions have been sent to your email.',
     };
@@ -336,14 +370,59 @@ export class AuthService {
   }
 
   async resetPassword(
-    user: User,
+    token: string,
     newPassword: string,
+    confirmPassword: string,
   ): Promise<{ message: string }> {
-    const userRecord = await this.getUserPassword(user.id);
-    if (userRecord.password) {
-      await this.validateNewPassword(newPassword, userRecord.password);
+    if (newPassword !== confirmPassword) {
+      throw new HttpException(
+        {
+          message: {
+            confirmPassword: 'Password and confirm password do not match',
+          },
+        },
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    await this.updateUserPassword(user.id, newPassword);
+
+    const user = await this.prismaService.user.findFirst({
+      where: { resetToken: this.hashToken(token) },
+    });
+    if (
+      !user ||
+      !user.resetTokenExpiresAt ||
+      user.resetTokenExpiresAt < new Date()
+    ) {
+      throw new HttpException(
+        { message: { token: 'Reset token is invalid or has expired' } },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    if (user.password) {
+      await this.validateNewPassword(newPassword, user.password);
+    }
+
+    const hashedPassword = await hash(
+      newPassword,
+      AuthService.BCRYPT_SALT_ROUNDS,
+    );
+    await this.prismaService.user.update({
+      where: { id: user.id },
+      // Xoá token sau khi dùng (one-time)
+      data: {
+        password: hashedPassword,
+        resetToken: null,
+        resetTokenExpiresAt: null,
+      },
+    });
+
+    // Thu hồi mọi refresh token cũ -> buộc đăng nhập lại trên mọi thiết bị
+    await this.prismaService.refreshToken.updateMany({
+      where: { userId: user.id },
+      data: { revoked: true },
+    });
+
     return { message: 'Password reset successfully' };
   }
 
@@ -390,7 +469,7 @@ export class AuthService {
     );
     await this.prismaService.user.update({
       where: { id: userId },
-      data: { password: hashedPassword, confirmPassword: hashedPassword },
+      data: { password: hashedPassword },
     });
   }
 
@@ -438,7 +517,7 @@ export class AuthService {
     newPassword: string,
     confirmPassword: string,
   ): Promise<void> {
-    if (isEqual(currentPassword, newPassword)) {
+    if (currentPassword === newPassword) {
       throw new HttpException(
         {
           message: {
@@ -448,7 +527,7 @@ export class AuthService {
         HttpStatus.BAD_REQUEST,
       );
     }
-    if (!isEqual(newPassword, confirmPassword)) {
+    if (newPassword !== confirmPassword) {
       throw new HttpException(
         {
           message: {
@@ -460,35 +539,63 @@ export class AuthService {
     }
   }
 
-  async refreshToken(
-    refreshTokenDto: RefreshTokenDto,
-  ): Promise<{ accessToken: string }> {
-    const userId = await this.validateRefreshToken(
-      refreshTokenDto.refreshToken,
-    );
-    if (!userId) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-    const user = await this.userService.getDetail(userId);
-    const accessToken = this.jwtService.sign({
-      id: user.id,
-      email: user.email,
-    });
-    return { accessToken };
-  }
-
-  private async validateRefreshToken(token: string): Promise<string | null> {
+  /**
+   * Refresh token rotation:
+   * - Verify chữ ký + đối chiếu hash trong DB (chống token bị thu hồi/giả mạo)
+   * - Thu hồi token cũ, cấp cặp token mới (mỗi lần refresh ra refresh token mới)
+   */
+  async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<AuthTokens> {
+    let decoded: JwtPayload;
     try {
-      const decoded = this.jwtService.verify(token, {
+      decoded = this.jwtService.verify(refreshTokenDto.refreshToken, {
         secret: process.env.REFRESH_TOKEN_KEY,
       });
-      return decoded.id;
     } catch (error) {
-      return null;
+      throw new UnauthorizedException('Invalid refresh token');
     }
+
+    const tokenHash = this.hashToken(refreshTokenDto.refreshToken);
+    const stored = await this.prismaService.refreshToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!stored || stored.revoked || stored.expiresAt < new Date()) {
+      throw new UnauthorizedException(
+        'Refresh token is invalid or has been revoked',
+      );
+    }
+
+    // Rotation: thu hồi token cũ trước khi cấp token mới
+    await this.prismaService.refreshToken.update({
+      where: { id: stored.id },
+      data: { revoked: true },
+    });
+
+    const user = await this.prismaService.user.findUnique({
+      where: { id: decoded.id },
+      include: { role: true },
+    });
+    if (!user || !user.role) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return this.generateTokens(user as UserWithRole);
   }
 
-  async googleLogin(user: any): Promise<any> {
+  /** Đăng xuất: thu hồi refresh token hiện tại */
+  async logout(refreshToken: string): Promise<{ message: string }> {
+    await this.prismaService.refreshToken.updateMany({
+      where: { tokenHash: this.hashToken(refreshToken) },
+      data: { revoked: true },
+    });
+    return { message: 'Logged out successfully' };
+  }
+
+  async googleLogin(user: {
+    email: string;
+    name: string;
+    googleId: string;
+  }): Promise<AuthResult> {
     if (!user) {
       throw new UnauthorizedException('No user from Google');
     }
@@ -512,8 +619,11 @@ export class AuthService {
       });
     }
 
-    const tokens = await this.generateTokens(existingUser);
-    return { ...tokens, user: this.formatUserResponse(existingUser) };
+    const tokens = await this.generateTokens(existingUser as UserWithRole);
+    return {
+      ...tokens,
+      user: this.formatUserResponse(existingUser as UserWithRole),
+    };
   }
 
   // re send verification email

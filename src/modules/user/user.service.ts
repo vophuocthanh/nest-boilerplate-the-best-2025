@@ -9,7 +9,6 @@ import {
 
 import { Prisma, User } from '@prisma/client';
 
-import { isEqual } from 'lodash';
 import { FileUploadService } from 'src/lib/file-upload.service';
 import { UpdateUserDto } from 'src/modules/user/dto/user.dto';
 
@@ -28,9 +27,7 @@ export class UserService {
     private fileUploadService: FileUploadService,
   ) {}
 
-  async getAll(
-    @Pagination(['sortBy']) pagination: PaginationParams,
-  ): Promise<any> {
+  async getAll(@Pagination(['sortBy']) pagination: PaginationParams) {
     const { itemsPerPage, skip, search, page, sort, sortBy } = pagination;
     const where: Prisma.UserWhereInput = search
       ? {
@@ -44,15 +41,17 @@ export class UserService {
     const orderBy: Prisma.UserOrderByWithRelationInput =
       sort && sortBy ? { [sortBy as string]: sort } : { createAt: 'desc' };
 
-    const users = await this.prismaService.user.findMany({
-      where,
-      skip,
-      take: itemsPerPage,
-      orderBy,
-      select: USER_SELECT,
-    });
-
-    const totalUsers = await this.prismaService.user.count({ where });
+    // Chạy query dữ liệu và đếm tổng song song để giảm round-trip tới DB
+    const [users, totalUsers] = await Promise.all([
+      this.prismaService.user.findMany({
+        where,
+        skip,
+        take: itemsPerPage,
+        orderBy,
+        select: USER_SELECT,
+      }),
+      this.prismaService.user.count({ where }),
+    ]);
 
     return ResponseUtil.paginate(users, totalUsers, page, itemsPerPage);
   }
@@ -69,8 +68,6 @@ export class UserService {
       country: true,
       createAt: true,
       updateAt: true,
-      verificationCode: true,
-      verificationCodeExpiresAt: true,
       isVerified: true,
       role: {
         select: {
@@ -170,10 +167,10 @@ export class UserService {
     if (!userToDelete) {
       throw new NotFoundException('User không tồn tại');
     }
-    if (isEqual(userToDelete.role?.name, 'ADMIN')) {
+    if (userToDelete.role?.name === 'ADMIN') {
       throw new ForbiddenException('Không thể xóa tài khoản có vai trò ADMIN');
     }
-    if (isEqual(userToDelete.id, currentUserId)) {
+    if (userToDelete.id === currentUserId) {
       throw new ForbiddenException('Không thể tự xóa chính mình');
     }
     await this.prismaService.user.delete({

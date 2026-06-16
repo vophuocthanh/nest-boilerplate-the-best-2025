@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm -v)",
+      "Bash(corepack --version)",
+      "Bash(pnpm exec *)",
+      "Bash(pnpm run *)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm gen *)",
+      "Bash(echo \"BUILD_EXIT=$?\")",
+      "Bash(git checkout *)",
+      "Bash(pnpm add *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Read(//tmp/**)",
+      "Bash(git rm *)",
+      "Bash(cd /Users/vophuocthanh/Documents/SoftwareEngineer/Backend/nestjs/nest-boilerplate; pnpm run build >/tmp/build.log 2>&1; echo \"EXIT=$?\"; tail -25 /tmp/build.log)",
+      "Bash(docker version *)",
+      "Bash(docker run *)",
+      "Bash(docker rmi *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('deps:', Object.keys\\(p.dependencies\\).length\\); console.log\\('devDeps:', Object.keys\\(p.devDependencies\\).length\\);\")",
+      "Bash(export DATABASE_URL=\"postgresql://postgres:postgres@localhost:5432/nestjs_boilerplate?schema=public\")",
+      "Bash(docker compose *)",
+      "Bash(echo \"TEST_EXIT=$?\")",
+      "Bash(pnpm lint *)",
+      "Bash(echo \"LINT_EXIT=$?\")",
+      "Bash(echo \"BUILD=$?\")",
+      "Bash(echo \"TEST=$?\")",
+      "Bash(timeout 25 node dist/main)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(node dist/main)",
+      "Bash(echo \"PID=$!\")",
+      "Bash(break)",
+      "Bash(node -e \"setTimeout\\(\\(\\)=>{},1500\\)\")",
+      "Bash(grep '\"version\"' __TRACKED_VAR__/package.json)",
+      "Bash(echo \"LINT=$?\")",
+      "Bash(docker build *)"
+    ],
+    "additionalDirectories": [
+      "/private/tmp"
+    ]
+  }
+}

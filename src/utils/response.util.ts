@@ -50,7 +50,7 @@ export class ResponseUtil {
     }
 
     if (typeof data === 'object' && data !== null) {
-      const formattedData = { ...data };
+      const formattedData = { ...data } as Record<string, unknown>;
       excludeFields.forEach((field) => {
         delete formattedData[field];
       });

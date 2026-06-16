@@ -1,55 +1,69 @@
-FROM node:18-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Set working directory
 WORKDIR /app
 
-# Install build dependencies
-RUN apk add --no-cache python3 make g++
+# Install build dependencies (openssl giúp Prisma generate đúng engine cho alpine)
+RUN apk add --no-cache python3 make g++ openssl
 
-# Copy package.json
-COPY package*.json ./
+# Enable pnpm via corepack (cập nhật corepack để tương thích pnpm 11)
+RUN npm install -g corepack@latest && corepack enable
 
-# Install dependencies
-RUN npm ci
+# Copy manifest and lockfile
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Copy source code
+# Install dependencies (build scripts approved via pnpm-workspace.yaml)
+RUN pnpm install --frozen-lockfile
+
+# Copy Prisma schema trước để cache layer `prisma generate`
+# (chỉ chạy lại khi schema đổi, không phải mỗi lần sửa src)
+COPY prisma ./prisma/
+RUN pnpm exec prisma generate
+
+# Copy source code và build
 COPY . .
+RUN pnpm run build
 
-# Generate Prisma client
-RUN npx prisma generate
-
-# Build application
-RUN npm run build
+# Loại devDependencies NGAY trong builder để layer node_modules copy sang runtime đã gọn.
+# (prune ở runtime sẽ vô ích vì layer COPY phía dưới vẫn giữ file dev -> phình image)
+RUN pnpm prune --prod --ignore-scripts
 
 ################################################################################
 # PRODUCTION IMAGE
 
-FROM node:18-alpine
+FROM node:22-alpine
+
+# Báo cho Nest/Express và các lib khác chạy ở chế độ production
+ENV NODE_ENV=production
 
 # Set working directory
 WORKDIR /app
 
-# Install production dependencies and OpenSSL
-RUN apk add --no-cache python3 make g++ openssl
+# openssl: cần cho Prisma runtime; tini: làm PID 1 để forward signal (SIGTERM) -> graceful shutdown.
+# KHÔNG cần build tools (python3/make/g++) vì native module (bcrypt) đã biên dịch ở stage builder.
+# KHÔNG cần pnpm/corepack ở runtime vì node_modules đã được prune sẵn ở builder.
+RUN apk add --no-cache openssl tini
 
-# Copy package files
-COPY package*.json ./
+# Copy node_modules đã prune sẵn (gồm bcrypt biên dịch + Prisma client) từ builder
+COPY --from=builder /app/node_modules ./node_modules
 
-# Install production dependencies only and rebuild bcrypt
-RUN npm ci --omit=dev --ignore-scripts && \
-    npm rebuild bcrypt --build-from-source
-
-# Copy Prisma schema
+# Copy Prisma schema, package.json và ứng dụng đã build
+COPY package.json ./
 COPY prisma ./prisma/
-
-# Generate Prisma client
-RUN npx prisma generate
-
-# Copy built application
 COPY --from=builder /app/dist ./dist
+
+# Chạy bằng user không phải root (user `node` uid 1000 có sẵn trong image)
+USER node
 
 # Expose port
 EXPOSE 3001
+
+# Healthcheck dùng endpoint /api/health đã có sẵn
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:3001/api/health || exit 1
+
+# tini làm init process -> xử lý signal & reap zombie đúng cách
+ENTRYPOINT ["/sbin/tini", "--"]
 
 # Start the application
 CMD ["node", "dist/main"]

@@ -22,8 +22,21 @@ Table users {
   isVerified Boolean [not null, default: false]
   role roles
   points Int [default: 0]
+  resetToken String
+  resetTokenExpiresAt DateTime
   sentMessages messages [not null]
   receivedMessages messages [not null]
+  refreshTokens refresh_tokens [not null]
+}
+
+Table refresh_tokens {
+  id String [pk]
+  tokenHash String [unique, not null]
+  userId String [not null]
+  user users [not null]
+  expiresAt DateTime [not null]
+  revoked Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
 }
 
 Table roles {
@@ -46,6 +59,8 @@ Table messages {
 }
 
 Ref: users.roleId > roles.id
+
+Ref: refresh_tokens.userId > users.id [delete: Cascade]
 
 Ref: messages.senderId > users.id
 

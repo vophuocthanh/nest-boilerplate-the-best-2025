@@ -1,4 +1,5 @@
-import { UseGuards } from '@nestjs/common';
+import { Logger, UseGuards } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -21,7 +22,13 @@ import { MessageService } from '@app/src/modules/messages/messages.service';
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin:
+      process.env.NODE_ENV === 'production'
+        ? (process.env.CORS_ORIGIN ?? '')
+            .split(',')
+            .map((o) => o.trim())
+            .filter(Boolean)
+        : true,
   },
 })
 export class MessagesGateway
@@ -30,18 +37,37 @@ export class MessagesGateway
   @WebSocketServer()
   server: Server;
 
+  private readonly logger = new Logger(MessagesGateway.name);
   private connectedClients: Map<string, Socket> = new Map();
 
-  constructor(private readonly messageService: MessageService) {}
+  constructor(
+    private readonly messageService: MessageService,
+    private readonly jwtService: JwtService,
+  ) {}
 
   async handleConnection(client: Socket) {
     try {
-      const userId = client.handshake.auth.userId;
-      if (userId) {
-        this.connectedClients.set(userId, client);
-        console.log(`Client connected: ${userId}`);
+      const token =
+        client.handshake.auth?.token ??
+        client.handshake.headers?.authorization?.split(' ')[1];
+
+      if (!token) {
+        throw new Error('Missing authentication token');
       }
+
+      const payload = this.jwtService.verify(token, {
+        secret: process.env.ACCESS_TOKEN_KEY,
+      });
+      const userId = payload.id;
+
+      // Lưu userId đã xác thực vào handshake để các handler khác dùng lại
+      client.handshake.auth.userId = userId;
+      this.connectedClients.set(userId, client);
+      this.logger.log(`Client connected: ${userId}`);
     } catch (error) {
+      this.logger.warn(
+        `Rejected socket connection: ${(error as Error).message}`,
+      );
       client.disconnect();
     }
   }
@@ -50,7 +76,7 @@ export class MessagesGateway
     const userId = client.handshake.auth.userId;
     if (userId) {
       this.connectedClients.delete(userId);
-      console.log(`Client disconnected: ${userId}`);
+      this.logger.log(`Client disconnected: ${userId}`);
     }
   }
 

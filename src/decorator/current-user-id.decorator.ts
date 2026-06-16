@@ -1,4 +1,9 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import {
+  ExecutionContext,
+  UnauthorizedException,
+  createParamDecorator,
+} from '@nestjs/common';
+
 import { RequestWithUser } from 'src/types/users';
 
 /**
@@ -12,7 +17,7 @@ export const CurrentUserId = createParamDecorator(
     const request = context.switchToHttp().getRequest<RequestWithUser>();
 
     if (!request.user?.id) {
-      throw new Error('User ID not found in request');
+      throw new UnauthorizedException('User ID not found in request');
     }
 
     return request.user.id;

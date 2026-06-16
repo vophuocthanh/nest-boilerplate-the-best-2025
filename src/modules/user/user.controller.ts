@@ -24,7 +24,6 @@ import { RolesGuard } from 'src/guard/roles.guard';
 import {
   UpdateUserDto,
   UpdateUserRoleDto,
-  UserPaginationResponse,
 } from 'src/modules/user/dto/user.dto';
 
 import { PaginationParams } from '@app/src/core/model/pagination-params';
@@ -60,9 +59,7 @@ export class UserController {
   @Get()
   @ApiCommonResponses('Lấy ra danh sách user')
   @CommonPagination()
-  getAll(
-    @Pagination(['sortBy']) params: PaginationParams,
-  ): Promise<UserPaginationResponse> {
+  getAll(@Pagination(['sortBy']) params: PaginationParams) {
     return this.userService.getAll(params);
   }
 

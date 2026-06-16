@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { PrismaService } from '@app/src/helpers/prisma.service';
 import { CreateMessageDto } from '@app/src/modules/messages/dto/create-message.dto';
@@ -76,8 +80,11 @@ export class MessageService {
       where: { id: messageId },
     });
 
-    if (!message || message.receiverId !== userId) {
-      throw new Error('Message not found or unauthorized');
+    if (!message) {
+      throw new NotFoundException('Message not found');
+    }
+    if (message.receiverId !== userId) {
+      throw new ForbiddenException('You cannot mark this message as read');
     }
 
     return this.prisma.message.update({

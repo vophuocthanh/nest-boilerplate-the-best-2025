@@ -1,4 +1,24 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nestjs-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-nestjs_boilerplate}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+
   nestjs-app:
     container_name: nestjs-boilerplate
     build:
@@ -8,6 +28,13 @@ services:
       - '3001:3001'
     env_file:
       - .env
+    environment:
+      # Trỏ về service postgres ở trên cho môi trường dev local.
+      # Bỏ dòng này nếu muốn dùng DATABASE_URL trong .env (vd: Neon).
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-nestjs_boilerplate}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
     volumes:
       - ./public:/app/public
       - ./prisma:/app/prisma
@@ -18,3 +45,6 @@ services:
 networks:
   app-network:
     driver: bridge
+
+volumes:
+  postgres-data:

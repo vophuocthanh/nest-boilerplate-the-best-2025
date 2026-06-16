@@ -8,7 +8,8 @@ module.exports = {
   plugins: ['@typescript-eslint/eslint-plugin'],
   extends: [
     'plugin:@typescript-eslint/recommended',
-    'plugin:prettier/recommended',
+    // Không dùng plugin:prettier/recommended để ESLint không báo lỗi formatting.
+    // Prettier vẫn chạy khi format on save qua VS Code.
   ],
   root: true,
   env: {

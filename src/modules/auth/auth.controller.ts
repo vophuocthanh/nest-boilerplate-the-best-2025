@@ -9,8 +9,11 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 import { User } from '@prisma/client';
+
+import { Request as ExpressRequest } from 'express';
 
 import { ApiCommonResponses } from '@app/src/decorator/api-common-responses.decorator';
 import { AuthService } from '@app/src/modules/auth/auth.service';
@@ -33,6 +36,8 @@ import { HandleAuthGuard } from '@app/src/modules/auth/guard/auth.guard';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  // Chống brute-force/spam: tối đa 5 request / 60s cho mỗi IP
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
   @ApiCommonResponses('Register account')
   async register(@Body() body: RegisterDto): Promise<{ message: string }> {
@@ -56,6 +61,8 @@ export class AuthController {
     };
   }
 
+  // Chống brute-force mật khẩu: tối đa 5 request / 60s cho mỗi IP
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   @ApiCommonResponses('Login')
   async login(@Body() body: LoginDto): Promise<any> {
@@ -67,9 +74,15 @@ export class AuthController {
   }
 
   @Post('refresh-token')
-  @ApiCommonResponses('Refresh token')
+  @ApiCommonResponses('Refresh token (rotation)')
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.refreshToken(refreshTokenDto);
+  }
+
+  @Post('logout')
+  @ApiCommonResponses('Logout (thu hồi refresh token)')
+  async logout(@Body() body: RefreshTokenDto) {
+    return this.authService.logout(body.refreshToken);
   }
 
   @Post('forgot-password')
@@ -82,15 +95,14 @@ export class AuthController {
     };
   }
 
-  @UseGuards(HandleAuthGuard)
   @Put('reset-password')
-  @ApiCommonResponses('Reset password')
-  async resetPassword(
-    @CurrentUser() user: User,
-    @Body() body: ResetPasswordDto,
-  ): Promise<any> {
-    const { newPassword } = body;
-    const result = await this.authService.resetPassword(user, newPassword);
+  @ApiCommonResponses('Reset password (dùng token từ email)')
+  async resetPassword(@Body() body: ResetPasswordDto): Promise<any> {
+    const result = await this.authService.resetPassword(
+      body.token,
+      body.newPassword,
+      body.confirm_password,
+    );
     return {
       ...result,
       message: 'SUCCESS.UPDATED',
@@ -120,15 +132,16 @@ export class AuthController {
   @Get('google')
   @UseGuards(AuthGuard('google'))
   @ApiCommonResponses('Start Google login')
-  async googleAuth(@Request() req) {
-    return req;
-  }
+  // Guard AuthGuard('google') sẽ redirect sang Google; body không bao giờ chạy
+  async googleAuth(): Promise<void> {}
 
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   @ApiCommonResponses('Handle Google login callback')
-  async googleAuthCallback(@Request() req) {
-    const result = await this.authService.googleLogin(req.user);
+  async googleAuthCallback(@Request() req: ExpressRequest) {
+    const result = await this.authService.googleLogin(
+      req.user as { email: string; name: string; googleId: string },
+    );
     return {
       ...result,
       message: 'AUTH.LOGIN_SUCCESS',

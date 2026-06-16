@@ -1,11 +1,13 @@
 import { ExecutionContext, createParamDecorator } from '@nestjs/common';
 
-import { numberConstants } from '@app/src/configs/consts';
 import {
   BasePaginationParams,
   PaginationParams,
   SortOrder,
 } from '@app/src/core/model/pagination-params';
+
+const DEFAULT_ITEMS_PER_PAGE = 10;
+const DEFAULT_PAGE = 1;
 
 export const Pagination = createParamDecorator(
   (
@@ -15,15 +17,12 @@ export const Pagination = createParamDecorator(
     const request = ctx.switchToHttp().getRequest();
     const filters = request.query;
 
-    const itemsPerPage = Number(filters.itemsPerPage) || numberConstants.TEN;
-    const page = Number(filters.page) || numberConstants.ONE;
+    const itemsPerPage = Number(filters.itemsPerPage) || DEFAULT_ITEMS_PER_PAGE;
+    const page = Number(filters.page) || DEFAULT_PAGE;
     const search = filters.search || '';
     const sort = filters.sort as SortOrder | undefined;
 
-    const skip =
-      page > numberConstants.ONE
-        ? (page - numberConstants.ONE) * itemsPerPage
-        : numberConstants.ZERO;
+    const skip = page > DEFAULT_PAGE ? (page - DEFAULT_PAGE) * itemsPerPage : 0;
 
     const baseParams: BasePaginationParams = {
       itemsPerPage,
