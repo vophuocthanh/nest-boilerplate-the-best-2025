@@ -16,6 +16,8 @@ export const envValidationSchema = Joi.object({
   // JWT
   ACCESS_TOKEN_KEY: Joi.string().required(),
   REFRESH_TOKEN_KEY: Joi.string().required(),
+  ACCESS_TOKEN_EXPIRES_IN: Joi.string().default('1d'),
+  REFRESH_TOKEN_EXPIRES_IN: Joi.string().default('7d'),
 
   // CORS (chỉ bắt buộc cấu hình ở production thông qua logic ở main.ts)
   CORS_ORIGIN: Joi.string().allow('').optional(),

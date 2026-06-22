@@ -1,4 +1,5 @@
 import { HttpException, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 
@@ -55,12 +56,21 @@ describe('AuthService', () => {
     };
     mail = { sendMail: jest.fn().mockResolvedValue(undefined) };
 
+    const configValues: Record<string, string> = {
+      'jwt.accessSecret': 'access-secret',
+      'jwt.refreshSecret': 'refresh-secret',
+      'jwt.accessExpiresIn': '1d',
+      'jwt.refreshExpiresIn': '7d',
+    };
+    const config = { get: jest.fn((key: string) => configValues[key]) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
         { provide: JwtService, useValue: jwt },
         { provide: MailService, useValue: mail },
+        { provide: ConfigService, useValue: config },
       ],
     }).compile();
 
@@ -84,6 +94,8 @@ describe('AuthService', () => {
         role: { name: 'USER' },
         password: 'hash',
       });
+      // Mật khẩu đúng -> mới tới được bước kiểm tra verify
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       await expectHttpError(
         service.login(credentials),
         'Account is not verified',
@@ -100,7 +112,7 @@ describe('AuthService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
       await expectHttpError(
         service.login(credentials),
-        'Password is not correct',
+        'Email hoặc mật khẩu không đúng',
       );
     });
 

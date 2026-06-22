@@ -8,8 +8,8 @@ import helmet from 'helmet';
 import { setupSwagger } from '@app/src/configs/swagger.config';
 
 import { AppModule } from './app.module';
+import { validationExceptionFactory } from './common/pipes/validation-exception.factory';
 import { loggerMiddleware } from './middlewares/logger.middleware';
-import { globalErrorHandler } from './middlewares/validation.middleware';
 
 const API_PREFIX = 'api';
 const PORT = Number(process.env.PORT) || 3001;
@@ -55,15 +55,11 @@ async function bootstrap() {
         enableImplicitConversion: true,
       },
       stopAtFirstError: false,
-      validationError: {
-        target: false,
-        value: false,
-      },
+      exceptionFactory: validationExceptionFactory,
     }),
   );
 
   app.use(loggerMiddleware);
-  app.use(globalErrorHandler);
 
   await app.listen(PORT);
 }

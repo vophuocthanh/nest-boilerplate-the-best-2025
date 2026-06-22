@@ -11,17 +11,15 @@ Table users {
   address String
   avatar String
   name String [not null]
-  date_of_birth String
+  date_of_birth DateTime
   country String
   createAt DateTime [default: `now()`, not null]
   updateAt DateTime
-  confirmPassword String
   roleId String
   verificationCode String
   verificationCodeExpiresAt DateTime
   isVerified Boolean [not null, default: false]
   role roles
-  points Int [default: 0]
   resetToken String
   resetTokenExpiresAt DateTime
   sentMessages messages [not null]

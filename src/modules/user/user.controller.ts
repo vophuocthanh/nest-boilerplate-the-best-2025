@@ -7,7 +7,6 @@ import {
   Post,
   Put,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -20,7 +19,6 @@ import { AuthenticatedController } from 'src/decorator/authenticated-controller.
 import { CommonPagination } from 'src/decorator/common-pagination.decorator';
 import { CurrentUserId } from 'src/decorator/current-user-id.decorator';
 import { Roles } from 'src/decorator/roles.decorator';
-import { RolesGuard } from 'src/guard/roles.guard';
 import {
   UpdateUserDto,
   UpdateUserRoleDto,
@@ -29,7 +27,6 @@ import {
 import { PaginationParams } from '@app/src/core/model/pagination-params';
 import { CommonQuery } from '@app/src/decorator/common-query.decorator';
 import { Pagination } from '@app/src/decorator/pagination.decorator';
-import { HandleAuthGuard } from '@app/src/modules/auth/guard/auth.guard';
 import { UserService } from '@app/src/modules/user/user.service';
 
 @ApiTags('User')
@@ -37,7 +34,6 @@ import { UserService } from '@app/src/modules/user/user.service';
 export class UserController {
   constructor(private userService: UserService) {}
 
-  @UseGuards(HandleAuthGuard)
   @Get('me')
   @ApiCommonResponses('Lấy ra thông tin user đang đăng nhập')
   async getCurrentUser(
@@ -53,7 +49,6 @@ export class UserController {
     return this.userService.getCountUser();
   }
 
-  @UseGuards(HandleAuthGuard)
   @CommonQuery('sort', 'Sort order (asc or desc)', ['asc', 'desc'])
   @CommonQuery('sortBy', 'Field to sort by', ['createAt'])
   @Get()
@@ -63,7 +58,6 @@ export class UserController {
     return this.userService.getAll(params);
   }
 
-  @UseGuards(HandleAuthGuard)
   @Get(':id')
   @ApiCommonResponses('Lấy ra thông tin chi tiết user')
   getDetail(
@@ -74,7 +68,6 @@ export class UserController {
     >;
   }
 
-  @UseGuards(HandleAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Put(':id/role')
   @ApiCommonResponses('Cập nhật role cho user')
@@ -86,14 +79,12 @@ export class UserController {
     return this.userService.updateUserRole(id, data.roleId, userId);
   }
 
-  @UseGuards(HandleAuthGuard)
   @Put('me')
   @ApiCommonResponses('Cập nhật thông tin user đang đăng nhập')
   async updateMe(@CurrentUserId() userId: string, @Body() data: UpdateUserDto) {
     return this.userService.updateMeUser(data, userId);
   }
 
-  @UseGuards(HandleAuthGuard)
   @Post('upload-avatar')
   @ApiCommonResponses('Upload user avatar')
   @ApiConsumes('multipart/form-data')
@@ -119,7 +110,6 @@ export class UserController {
     return await this.userService.updateAvatarS3(userId, file);
   }
 
-  @UseGuards(HandleAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Delete(':id')
   @ApiCommonResponses('Xóa user')

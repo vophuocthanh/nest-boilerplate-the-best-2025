@@ -14,14 +14,18 @@ export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const roles = this.reflector.get<string[]>(ROLES_KEY, context.getHandler());
-    if (!roles) {
+    const roles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    // Route không khai báo @Roles -> không giới hạn theo role
+    if (!roles || roles.length === 0) {
       return true;
     }
 
     const { user } = context.switchToHttp().getRequest<RequestWithUser>();
 
-    if (!roles.includes(user.role)) {
+    if (!user || !roles.includes(user.role)) {
       throw new ForbiddenException('Bạn không có quyền truy cập');
     }
 

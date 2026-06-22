@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 
 import { MessagesGateway } from '@app/src/modules/messages/messages.gateway';
@@ -6,9 +7,15 @@ import { MessageService } from '@app/src/modules/messages/messages.service';
 
 @Module({
   imports: [
-    JwtModule.register({
-      secret: process.env.ACCESS_TOKEN_KEY,
-      signOptions: { expiresIn: '1d' },
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('jwt.accessSecret'),
+        signOptions: {
+          expiresIn: configService.get<string>('jwt.accessExpiresIn'),
+        },
+      }),
+      inject: [ConfigService],
     }),
   ],
   providers: [MessagesGateway, MessageService],

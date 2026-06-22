@@ -2,7 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { User } from '@prisma/client';
 
+import { Type } from 'class-transformer';
 import {
+  IsDate,
   IsEmail,
   IsNotEmpty,
   IsOptional,
@@ -39,9 +41,11 @@ export class UpdateUserDto {
   @IsOptional()
   address?: string;
 
-  @ApiProperty()
+  @ApiProperty({ type: String, format: 'date-time', required: false })
   @IsOptional()
-  date_of_birth?: string;
+  @Type(() => Date)
+  @IsDate()
+  date_of_birth?: Date;
 
   @ApiProperty()
   @IsOptional()

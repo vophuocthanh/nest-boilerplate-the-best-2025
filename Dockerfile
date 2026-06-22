@@ -52,6 +52,9 @@ COPY package.json ./
 COPY prisma ./prisma/
 COPY --from=builder /app/dist ./dist
 
+# Entrypoint script: chạy `prisma migrate deploy` rồi mới start app
+COPY --chmod=755 docker-entrypoint.sh ./docker-entrypoint.sh
+
 # Chạy bằng user không phải root (user `node` uid 1000 có sẵn trong image)
 USER node
 
@@ -65,5 +68,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 # tini làm init process -> xử lý signal & reap zombie đúng cách
 ENTRYPOINT ["/sbin/tini", "--"]
 
-# Start the application
-CMD ["node", "dist/main"]
+# Apply migration rồi start app
+CMD ["sh", "./docker-entrypoint.sh"]

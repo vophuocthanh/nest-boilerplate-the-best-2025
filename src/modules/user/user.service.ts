@@ -183,17 +183,4 @@ export class UserService {
     const totalUsers = await this.prismaService.user.count();
     return { data: { total: totalUsers } };
   }
-
-  async getUserPoints(userId: string): Promise<number> {
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-      select: { points: true },
-    });
-
-    if (!user) {
-      throw new BadRequestException('User not found');
-    }
-
-    return user.points || 0;
-  }
 }

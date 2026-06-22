@@ -15,6 +15,7 @@ import { User } from '@prisma/client';
 
 import { Request as ExpressRequest } from 'express';
 
+import { Public } from '@app/src/common/decorators/public.decorator';
 import { ApiCommonResponses } from '@app/src/decorator/api-common-responses.decorator';
 import { AuthService } from '@app/src/modules/auth/auth.service';
 import { CurrentUser } from '@app/src/modules/auth/decorator/current-user.decorator';
@@ -28,7 +29,6 @@ import { LoginDto } from '@app/src/modules/auth/dto/login.dto';
 import { RefreshTokenDto } from '@app/src/modules/auth/dto/refresh-token.dto';
 import { RegisterDto } from '@app/src/modules/auth/dto/register.dto';
 import { VerifyEmailDto } from '@app/src/modules/auth/dto/verify-code';
-import { HandleAuthGuard } from '@app/src/modules/auth/guard/auth.guard';
 
 @ApiBearerAuth()
 @ApiTags('Authentication')
@@ -37,6 +37,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   // Chống brute-force/spam: tối đa 5 request / 60s cho mỗi IP
+  @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('register')
   @ApiCommonResponses('Register account')
@@ -48,6 +49,7 @@ export class AuthController {
     };
   }
 
+  @Public()
   @ApiCommonResponses('Verify email')
   @Post('verify-email')
   async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
@@ -62,6 +64,7 @@ export class AuthController {
   }
 
   // Chống brute-force mật khẩu: tối đa 5 request / 60s cho mỗi IP
+  @Public()
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   @ApiCommonResponses('Login')
@@ -73,18 +76,21 @@ export class AuthController {
     };
   }
 
+  @Public()
   @Post('refresh-token')
   @ApiCommonResponses('Refresh token (rotation)')
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
     return this.authService.refreshToken(refreshTokenDto);
   }
 
+  @Public()
   @Post('logout')
   @ApiCommonResponses('Logout (thu hồi refresh token)')
   async logout(@Body() body: RefreshTokenDto) {
     return this.authService.logout(body.refreshToken);
   }
 
+  @Public()
   @Post('forgot-password')
   @ApiCommonResponses('Forgot password')
   async forgotPassword(@Body() body: ForgotPasswordDto): Promise<any> {
@@ -95,6 +101,7 @@ export class AuthController {
     };
   }
 
+  @Public()
   @Put('reset-password')
   @ApiCommonResponses('Reset password (dùng token từ email)')
   async resetPassword(@Body() body: ResetPasswordDto): Promise<any> {
@@ -109,7 +116,6 @@ export class AuthController {
     };
   }
 
-  @UseGuards(HandleAuthGuard)
   @ApiCommonResponses('Change password')
   @Put('change-password')
   async changePassword(
@@ -129,12 +135,14 @@ export class AuthController {
     };
   }
 
+  @Public()
   @Get('google')
   @UseGuards(AuthGuard('google'))
   @ApiCommonResponses('Start Google login')
   // Guard AuthGuard('google') sẽ redirect sang Google; body không bao giờ chạy
   async googleAuth(): Promise<void> {}
 
+  @Public()
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   @ApiCommonResponses('Handle Google login callback')
@@ -148,6 +156,7 @@ export class AuthController {
     };
   }
 
+  @Public()
   @Post('resend-verification-email')
   @ApiCommonResponses('Resend verification email')
   async resendVerificationEmail(@Body() body: ResendVerificationEmailDto) {

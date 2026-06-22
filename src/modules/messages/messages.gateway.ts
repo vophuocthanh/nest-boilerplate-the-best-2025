@@ -1,4 +1,5 @@
 import { Logger, UseGuards } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import {
   OnGatewayConnection,
@@ -43,6 +44,7 @@ export class MessagesGateway
   constructor(
     private readonly messageService: MessageService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -56,7 +58,7 @@ export class MessagesGateway
       }
 
       const payload = this.jwtService.verify(token, {
-        secret: process.env.ACCESS_TOKEN_KEY,
+        secret: this.configService.get<string>('jwt.accessSecret'),
       });
       const userId = payload.id;
 

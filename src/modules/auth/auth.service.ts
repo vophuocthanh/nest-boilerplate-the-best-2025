@@ -4,12 +4,13 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 
 import { User } from '@prisma/client';
 
 import { compare, hash } from 'bcrypt';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, randomInt } from 'crypto';
 
 import { PrismaService } from '@app/src/helpers/prisma.service';
 import { ForgotPasswordDto } from '@app/src/modules/auth/dto/auth.dto';
@@ -43,12 +44,16 @@ export class AuthService {
     private prismaService: PrismaService,
     private jwtService: JwtService,
     private mailService: MailService,
+    private configService: ConfigService,
   ) {}
 
   private generateVerificationCode(): { code: string; expiresAt: Date } {
-    const code = Array.from({ length: AuthService.CODE_LENGTH }, () =>
-      Math.floor(Math.random() * 10),
-    ).join('');
+    // randomInt (CSPRNG) thay cho Math.random để mã xác thực không đoán được
+    const max = 10 ** AuthService.CODE_LENGTH;
+    const code = String(randomInt(0, max)).padStart(
+      AuthService.CODE_LENGTH,
+      '0',
+    );
     const expiresAt = new Date();
     expiresAt.setMinutes(
       expiresAt.getMinutes() + AuthService.EXPIRATION_MINUTES,
@@ -232,17 +237,26 @@ export class AuthService {
     email: string;
     password: string;
   }): Promise<UserWithRole> {
+    // Thông báo chung cho cả "email không tồn tại" lẫn "sai mật khẩu"
+    // -> tránh lộ email nào đã đăng ký (account enumeration).
+    const invalidCredentials = new UnauthorizedException({
+      message: { credentials: 'Email hoặc mật khẩu không đúng' },
+    });
+
     const user = await this.prismaService.user.findUnique({
       where: { email: credentials.email },
       include: { role: true },
     });
 
-    if (!user) {
-      throw new HttpException(
-        { message: { email: 'Account not found' } },
-        HttpStatus.UNAUTHORIZED,
-      );
+    if (!user || !user.password) {
+      throw invalidCredentials;
     }
+
+    const isPasswordValid = await compare(credentials.password, user.password);
+    if (!isPasswordValid) {
+      throw invalidCredentials;
+    }
+
     if (!user.isVerified) {
       throw new HttpException(
         { message: { account: 'Account is not verified' } },
@@ -253,20 +267,6 @@ export class AuthService {
       throw new HttpException(
         { message: { role: 'User role not assigned' } },
         HttpStatus.FORBIDDEN,
-      );
-    }
-    if (!user.password) {
-      throw new HttpException(
-        { message: { account: 'Please use Google login for this account' } },
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
-
-    const isPasswordValid = await compare(credentials.password, user.password);
-    if (!isPasswordValid) {
-      throw new HttpException(
-        { message: { password: 'Password is not correct' } },
-        HttpStatus.UNAUTHORIZED,
       );
     }
     // role đã được đảm bảo non-null qua check phía trên
@@ -282,12 +282,12 @@ export class AuthService {
     };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        secret: process.env.ACCESS_TOKEN_KEY,
-        expiresIn: '1d',
+        secret: this.configService.get<string>('jwt.accessSecret'),
+        expiresIn: this.configService.get<string>('jwt.accessExpiresIn'),
       }),
       this.jwtService.signAsync(payload, {
-        secret: process.env.REFRESH_TOKEN_KEY,
-        expiresIn: '7d',
+        secret: this.configService.get<string>('jwt.refreshSecret'),
+        expiresIn: this.configService.get<string>('jwt.refreshExpiresIn'),
       }),
     ]);
     await this.persistRefreshToken(user.id, refreshToken);
@@ -320,7 +320,17 @@ export class AuthService {
   }
 
   async forgotPassword(data: ForgotPasswordDto): Promise<{ message: string }> {
-    const user = await this.findUserByEmail(data.email);
+    const genericMessage = {
+      message: 'If the email exists, reset instructions have been sent.',
+    };
+
+    const user = await this.prismaService.user.findUnique({
+      where: { email: data.email },
+    });
+    // Luôn trả về thông báo chung để không lộ email nào đã đăng ký.
+    if (!user) {
+      return genericMessage;
+    }
 
     // Token reset ngẫu nhiên, dùng 1 lần, hết hạn sau RESET_TOKEN_TTL_MINUTES
     const resetToken = randomBytes(32).toString('hex');
@@ -339,9 +349,7 @@ export class AuthService {
 
     // Email gửi token thô; FE ghép với URL_RESET_PASSWORD để tạo link reset
     await this.sendResetPasswordEmail(data.email, resetToken);
-    return {
-      message: 'Password reset instructions have been sent to your email.',
-    };
+    return genericMessage;
   }
 
   private async findUserByEmail(email: string): Promise<User> {
@@ -548,7 +556,7 @@ export class AuthService {
     let decoded: JwtPayload;
     try {
       decoded = this.jwtService.verify(refreshTokenDto.refreshToken, {
-        secret: process.env.REFRESH_TOKEN_KEY,
+        secret: this.configService.get<string>('jwt.refreshSecret'),
       });
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');

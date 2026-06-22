@@ -33,7 +33,9 @@
       "Bash(node -e \"setTimeout\\(\\(\\)=>{},1500\\)\")",
       "Bash(grep '\"version\"' __TRACKED_VAR__/package.json)",
       "Bash(echo \"LINT=$?\")",
-      "Bash(docker build *)"
+      "Bash(docker build *)",
+      "Bash(perl -0pi -e 's/  \\\\@UseGuards\\\\\\(HandleAuthGuard, RolesGuard\\\\\\)\\\\n//g; s/  \\\\@UseGuards\\\\\\(HandleAuthGuard\\\\\\)\\\\n//g' src/modules/user/user.controller.ts)",
+      "Bash(pnpm install *)"
     ],
     "additionalDirectories": [
       "/private/tmp"

@@ -3,24 +3,31 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
-import * as dotenv from 'dotenv';
 import { extname } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
-dotenv.config();
-
 @Injectable()
 export class FileUploadService {
-  private s3 = new S3Client({
-    region: process.env.AWS_REGION,
-    credentials: {
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID as string,
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY as string,
-    },
-  });
+  private readonly s3: S3Client;
+  private readonly region: string;
+  private readonly bucket: string;
+
+  constructor(private readonly configService: ConfigService) {
+    this.region = this.configService.get<string>('aws.region') ?? '';
+    this.bucket = this.configService.get<string>('aws.bucket') ?? '';
+    this.s3 = new S3Client({
+      region: this.region,
+      credentials: {
+        accessKeyId: this.configService.get<string>('aws.accessKeyId') ?? '',
+        secretAccessKey:
+          this.configService.get<string>('aws.secretAccessKey') ?? '',
+      },
+    });
+  }
 
   async uploadImageToS3(
     file: Express.Multer.File,
@@ -33,14 +40,15 @@ export class FileUploadService {
     try {
       const fileExtension = extname(file.originalname);
       const fileKey = `${folder}/${uuidv4()}${fileExtension}`;
-      const uploadParams = {
-        Bucket: process.env.AWS_S3_BUCKET_NAME,
-        Key: fileKey,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-      };
-      await this.s3.send(new PutObjectCommand(uploadParams));
-      return `https://${process.env.AWS_S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${fileKey}`;
+      await this.s3.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: fileKey,
+          Body: file.buffer,
+          ContentType: file.mimetype,
+        }),
+      );
+      return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${fileKey}`;
     } catch (error) {
       throw new InternalServerErrorException('Error uploading file to S3');
     }
