@@ -35,7 +35,10 @@
       "Bash(echo \"LINT=$?\")",
       "Bash(docker build *)",
       "Bash(perl -0pi -e 's/  \\\\@UseGuards\\\\\\(HandleAuthGuard, RolesGuard\\\\\\)\\\\n//g; s/  \\\\@UseGuards\\\\\\(HandleAuthGuard\\\\\\)\\\\n//g' src/modules/user/user.controller.ts)",
-      "Bash(pnpm install *)"
+      "Bash(pnpm install *)",
+      "Bash(npx eslint *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"eslint exit=$?\")"
     ],
     "additionalDirectories": [
       "/private/tmp"

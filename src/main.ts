@@ -1,41 +1,28 @@
 import { ValidationPipe } from '@nestjs/common';
-import { CorsOptions } from '@nestjs/common/interfaces/external/cors-options.interface';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
+import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 
 import { setupSwagger } from '@app/src/configs/swagger.config';
 
 import { AppModule } from './app.module';
+import { buildCorsOptions } from './common/config/cors.config';
 import { validationExceptionFactory } from './common/pipes/validation-exception.factory';
 import { loggerMiddleware } from './middlewares/logger.middleware';
 
 const API_PREFIX = 'api';
 const PORT = Number(process.env.PORT) || 3001;
-
-/**
- * Danh sách origin được phép.
- * - Production: chỉ cho phép các origin khai báo trong env CORS_ORIGIN (ngăn cách bằng dấu phẩy).
- * - Dev: cho phép tất cả để tiện debug.
- */
-function buildCorsOptions(): CorsOptions {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const whitelist = (process.env.CORS_ORIGIN ?? '')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-
-  return {
-    origin: isProduction ? (whitelist.length ? whitelist : false) : true,
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    credentials: true,
-  };
-}
+const BODY_LIMIT = '1mb';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.setGlobalPrefix(API_PREFIX);
+
+  // Giới hạn kích thước body để chặn payload quá lớn (DoS)
+  app.use(json({ limit: BODY_LIMIT }));
+  app.use(urlencoded({ extended: true, limit: BODY_LIMIT }));
 
   // Security headers
   app.use(helmet());

@@ -1,4 +1,4 @@
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import {
@@ -7,11 +7,12 @@ import {
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
+  WsException,
 } from '@nestjs/websockets';
 
 import { Server, Socket } from 'socket.io';
 
-import { WsJwtAuthGuard } from '@app/src/auth/guards/ws-jwt-auth.guard';
+import { getCorsOrigin } from '@app/src/common/config/cors.config';
 import { MessageService } from '@app/src/modules/messages/messages.service';
 
 // Các events chính trong hệ thống:
@@ -23,20 +24,14 @@ import { MessageService } from '@app/src/modules/messages/messages.service';
 
 @WebSocketGateway({
   cors: {
-    origin:
-      process.env.NODE_ENV === 'production'
-        ? (process.env.CORS_ORIGIN ?? '')
-            .split(',')
-            .map((o) => o.trim())
-            .filter(Boolean)
-        : true,
+    origin: getCorsOrigin(),
   },
 })
 export class MessagesGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
   private readonly logger = new Logger(MessagesGateway.name);
   private connectedClients: Map<string, Socket> = new Map();
@@ -82,14 +77,35 @@ export class MessagesGateway
     }
   }
 
-  @UseGuards(WsJwtAuthGuard)
+  // Lấy userId đã xác thực ở handleConnection; socket chưa auth đã bị disconnect.
+  private getAuthedUserId(client: Socket): string {
+    const userId = client.handshake.auth.userId;
+    if (!userId) {
+      throw new WsException('Unauthorized');
+    }
+    return userId;
+  }
+
   @SubscribeMessage('sendMessage')
   async handleMessage(
     client: Socket,
     payload: { content: string; receiverId: string },
   ) {
-    const senderId = client.handshake.auth.userId;
-    const { content, receiverId } = payload;
+    const senderId = this.getAuthedUserId(client);
+    const content = payload?.content?.trim();
+    const receiverId = payload?.receiverId;
+
+    // Validate payload tối thiểu (gateway không đi qua ValidationPipe của HTTP).
+    if (!content || !receiverId) {
+      client.emit('error', { message: 'content và receiverId là bắt buộc' });
+      return;
+    }
+    if (receiverId === senderId) {
+      client.emit('error', {
+        message: 'Không thể gửi tin nhắn cho chính mình',
+      });
+      return;
+    }
 
     try {
       const message = await this.messageService.createMessage({
@@ -109,14 +125,21 @@ export class MessagesGateway
 
       return message;
     } catch (error) {
+      this.logger.error(
+        `sendMessage failed (sender=${senderId})`,
+        error instanceof Error ? error.stack : String(error),
+      );
       client.emit('error', { message: 'Failed to send message' });
     }
   }
 
-  @UseGuards(WsJwtAuthGuard)
   @SubscribeMessage('markAsRead')
   async handleMarkAsRead(client: Socket, messageId: string) {
-    const userId = client.handshake.auth.userId;
+    const userId = this.getAuthedUserId(client);
+    if (!messageId) {
+      client.emit('error', { message: 'messageId là bắt buộc' });
+      return;
+    }
     try {
       const message = await this.messageService.markMessageAsRead(
         messageId,
@@ -131,6 +154,10 @@ export class MessagesGateway
 
       return message;
     } catch (error) {
+      this.logger.error(
+        `markAsRead failed (user=${userId})`,
+        error instanceof Error ? error.stack : String(error),
+      );
       client.emit('error', { message: 'Failed to mark message as read' });
     }
   }

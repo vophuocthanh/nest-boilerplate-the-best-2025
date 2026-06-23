@@ -12,6 +12,7 @@ import { Prisma, User } from '@prisma/client';
 import { FileUploadService } from 'src/lib/file-upload.service';
 import { UpdateUserDto } from 'src/modules/user/dto/user.dto';
 
+import { paginate } from '@app/src/common/helpers/paginate';
 import { USER_SELECT } from '@app/src/configs/const';
 import { PaginationParams } from '@app/src/core/model/pagination-params';
 import { PaginationResponse } from '@app/src/core/model/pagination-response';
@@ -22,6 +23,15 @@ import { ResponseUtil } from '../../utils/response.util';
 
 @Injectable()
 export class UserService {
+  // Chỉ cho phép sort theo các field hợp lệ -> tránh "sortBy" tuỳ tiện
+  // gây PrismaClientValidationError (rơi vào nhánh 500 ở exception filter).
+  private static readonly ALLOWED_SORT_FIELDS = [
+    'createAt',
+    'updateAt',
+    'name',
+    'email',
+  ] as const;
+
   constructor(
     private prismaService: PrismaService,
     private fileUploadService: FileUploadService,
@@ -38,47 +48,31 @@ export class UserService {
         }
       : {};
 
-    const orderBy: Prisma.UserOrderByWithRelationInput =
-      sort && sortBy ? { [sortBy as string]: sort } : { createAt: 'desc' };
+    const sortField =
+      typeof sortBy === 'string' &&
+      UserService.ALLOWED_SORT_FIELDS.includes(
+        sortBy as (typeof UserService.ALLOWED_SORT_FIELDS)[number],
+      )
+        ? sortBy
+        : 'createAt';
+    const orderBy: Prisma.UserOrderByWithRelationInput = {
+      [sortField]: sort ?? 'desc',
+    };
 
-    // Chạy query dữ liệu và đếm tổng song song để giảm round-trip tới DB
-    const [users, totalUsers] = await Promise.all([
-      this.prismaService.user.findMany({
-        where,
-        skip,
-        take: itemsPerPage,
-        orderBy,
-        select: USER_SELECT,
-      }),
-      this.prismaService.user.count({ where }),
-    ]);
-
-    return ResponseUtil.paginate(users, totalUsers, page, itemsPerPage);
+    return paginate(this.prismaService.user, {
+      where,
+      orderBy,
+      select: USER_SELECT,
+      page,
+      itemsPerPage,
+      skip,
+    });
   }
 
   async getDetail(id: string): Promise<Partial<User>> {
-    const userSelect = {
-      id: true,
-      email: true,
-      phone: true,
-      address: true,
-      avatar: true,
-      name: true,
-      date_of_birth: true,
-      country: true,
-      createAt: true,
-      updateAt: true,
-      isVerified: true,
-      role: {
-        select: {
-          name: true,
-        },
-      },
-    };
-
     const user = await this.prismaService.user.findUnique({
       where: { id },
-      select: userSelect,
+      select: USER_SELECT,
     });
 
     if (!user) {
@@ -89,9 +83,12 @@ export class UserService {
   }
 
   async updateMeUser(data: UpdateUserDto, id: string) {
+    // Chỉ cho phép cập nhật các field hồ sơ cá nhân.
+    // KHÔNG nhận roleId/isVerified... từ client để tránh leo thang đặc quyền.
+    const { name, address, country, phone, date_of_birth } = data;
     const user = await this.prismaService.user.update({
       where: { id },
-      data,
+      data: { name, address, country, phone, date_of_birth },
     });
 
     return ResponseUtil.success(

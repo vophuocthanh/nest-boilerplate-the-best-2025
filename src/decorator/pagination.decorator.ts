@@ -8,6 +8,17 @@ import {
 
 const DEFAULT_ITEMS_PER_PAGE = 10;
 const DEFAULT_PAGE = 1;
+const MAX_ITEMS_PER_PAGE = 100;
+
+/** Ép giá trị về số nguyên dương, fallback về default; chặn cận trên nếu có max. */
+function toPositiveInt(value: unknown, fallback: number, max?: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+  const intValue = Math.floor(parsed);
+  return max ? Math.min(intValue, max) : intValue;
+}
 
 export const Pagination = createParamDecorator(
   (
@@ -17,10 +28,15 @@ export const Pagination = createParamDecorator(
     const request = ctx.switchToHttp().getRequest();
     const filters = request.query;
 
-    const itemsPerPage = Number(filters.itemsPerPage) || DEFAULT_ITEMS_PER_PAGE;
-    const page = Number(filters.page) || DEFAULT_PAGE;
+    // Chặn cận trên itemsPerPage để tránh client ép DB trả về toàn bộ bảng (DoS).
+    const itemsPerPage = toPositiveInt(
+      filters.itemsPerPage,
+      DEFAULT_ITEMS_PER_PAGE,
+      MAX_ITEMS_PER_PAGE,
+    );
+    const page = toPositiveInt(filters.page, DEFAULT_PAGE);
     const search = filters.search || '';
-    const sort = filters.sort as SortOrder | undefined;
+    const sort: SortOrder = filters.sort === 'asc' ? 'asc' : 'desc';
 
     const skip = page > DEFAULT_PAGE ? (page - DEFAULT_PAGE) * itemsPerPage : 0;
 

@@ -43,6 +43,9 @@ model User {
   // Refresh token sessions (rotation + revoke)
   refreshTokens RefreshToken[]
 
+  // Index cho tra cứu token (resetPassword query findFirst theo resetToken)
+  @@index([resetToken])
+  @@index([roleId])
   @@map("users")
 }
 

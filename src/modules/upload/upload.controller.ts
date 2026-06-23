@@ -14,6 +14,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
+import { imageUploadOptions } from '@app/src/common/config/multer-image.options';
+
 import { UploadService } from './upload.service';
 
 @ApiTags('File Upload')
@@ -49,7 +51,7 @@ export class UploadController {
       },
     },
   })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions))
   async uploadSingleFile(@UploadedFile() file: Express.Multer.File) {
     const url = await this.uploadService.uploadSingleFile(file);
     return { url };
@@ -89,7 +91,7 @@ export class UploadController {
       },
     },
   })
-  @UseInterceptors(FilesInterceptor('files'))
+  @UseInterceptors(FilesInterceptor('files', 10, imageUploadOptions))
   async uploadMultipleFiles(@UploadedFiles() files: Express.Multer.File[]) {
     const urls = await this.uploadService.uploadMultipleFiles(files);
     return { urls };

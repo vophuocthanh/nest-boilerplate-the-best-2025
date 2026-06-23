@@ -32,17 +32,6 @@ export class ResponseUtil {
     };
   }
 
-  static error(
-    message: string = 'Error',
-    status: number = 400,
-  ): PaginationResponse<null> {
-    return {
-      data: null,
-      message,
-      status,
-    };
-  }
-
   // Format any response with excluded fields
   static formatResponse<T>(data: T, excludeFields: string[] = []): T {
     if (Array.isArray(data)) {
@@ -68,11 +57,5 @@ export class ResponseUtil {
       'verificationCodeExpiresAt',
     ];
     return this.formatResponse(user, defaultExcludedFields);
-  }
-
-  // Format message response with default excluded fields
-  static formatMessageResponse<T>(message: T): T {
-    const defaultExcludedFields = ['deletedAt'];
-    return this.formatResponse(message, defaultExcludedFields);
   }
 }

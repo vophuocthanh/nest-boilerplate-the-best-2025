@@ -352,17 +352,6 @@ export class AuthService {
     return genericMessage;
   }
 
-  private async findUserByEmail(email: string): Promise<User> {
-    const user = await this.prismaService.user.findUnique({ where: { email } });
-    if (!user) {
-      throw new HttpException(
-        { message: { email: `Email ${email} not found` } },
-        HttpStatus.UNAUTHORIZED,
-      );
-    }
-    return user;
-  }
-
   private async sendResetPasswordEmail(
     email: string,
     accessToken: string,
@@ -608,23 +597,45 @@ export class AuthService {
       throw new UnauthorizedException('No user from Google');
     }
 
+    // Ưu tiên khớp theo googleId (tài khoản đã từng đăng nhập Google).
     let existingUser = await this.prismaService.user.findFirst({
-      where: { OR: [{ email: user.email }, { googleId: user.googleId }] },
+      where: { googleId: user.googleId },
       include: { role: true },
     });
 
     if (!existingUser) {
-      const defaultRole = await this.getDefaultRole();
-      existingUser = await this.prismaService.user.create({
-        data: {
-          email: user.email,
-          name: user.name,
-          googleId: user.googleId,
-          isVerified: true,
-          role: { connect: { id: defaultRole.id } },
-        },
+      // Chưa có tài khoản Google -> kiểm tra xem email đã tồn tại (tài khoản local) chưa.
+      const userByEmail = await this.prismaService.user.findUnique({
+        where: { email: user.email },
         include: { role: true },
       });
+
+      if (userByEmail) {
+        // Chỉ auto-link Google vào tài khoản local nếu nó đã được xác thực,
+        // tránh việc người khác chiếm tài khoản local chưa verify trùng email.
+        if (!userByEmail.isVerified) {
+          throw new UnauthorizedException(
+            'Email đã được đăng ký nhưng chưa xác thực. Vui lòng xác thực trước khi liên kết Google.',
+          );
+        }
+        existingUser = await this.prismaService.user.update({
+          where: { id: userByEmail.id },
+          data: { googleId: user.googleId },
+          include: { role: true },
+        });
+      } else {
+        const defaultRole = await this.getDefaultRole();
+        existingUser = await this.prismaService.user.create({
+          data: {
+            email: user.email,
+            name: user.name,
+            googleId: user.googleId,
+            isVerified: true,
+            role: { connect: { id: defaultRole.id } },
+          },
+          include: { role: true },
+        });
+      }
     }
 
     const tokens = await this.generateTokens(existingUser as UserWithRole);
@@ -636,13 +647,34 @@ export class AuthService {
 
   // re send verification email
   async resendVerificationEmail(email: string): Promise<{ message: string }> {
-    const user = await this.findUserByEmail(email);
+    // Luôn trả về thông báo chung để không lộ email nào đã đăng ký (account enumeration).
+    const genericMessage = {
+      message:
+        'Nếu email tồn tại và chưa xác thực, mã xác thực mới đã được gửi',
+    };
+
+    const user = await this.prismaService.user.findUnique({
+      where: { email },
+    });
+    // Bỏ qua nếu user không tồn tại hoặc đã xác thực -> không tiết lộ trạng thái.
+    if (!user || user.isVerified) {
+      return genericMessage;
+    }
+
+    // Sinh mã mới và LƯU vào DB để verifyEmail đối chiếu được.
     const verificationData = this.generateVerificationCode();
+    await this.prismaService.user.update({
+      where: { id: user.id },
+      data: {
+        verificationCode: verificationData.code,
+        verificationCodeExpiresAt: verificationData.expiresAt,
+      },
+    });
     await this.sendVerificationEmail({
       email: user.email,
       verificationCode: verificationData.code,
     });
 
-    return { message: 'Email xác thực đã được gửi lại' };
+    return genericMessage;
   }
 }

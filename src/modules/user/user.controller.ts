@@ -14,16 +14,17 @@ import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 
 import { User } from '@prisma/client';
 
+import { CurrentUserId } from 'src/common/decorators/current-user.decorator';
 import { ApiCommonResponses } from 'src/decorator/api-common-responses.decorator';
 import { AuthenticatedController } from 'src/decorator/authenticated-controller.decorator';
 import { CommonPagination } from 'src/decorator/common-pagination.decorator';
-import { CurrentUserId } from 'src/decorator/current-user-id.decorator';
 import { Roles } from 'src/decorator/roles.decorator';
 import {
   UpdateUserDto,
   UpdateUserRoleDto,
 } from 'src/modules/user/dto/user.dto';
 
+import { imageUploadOptions } from '@app/src/common/config/multer-image.options';
 import { PaginationParams } from '@app/src/core/model/pagination-params';
 import { CommonQuery } from '@app/src/decorator/common-query.decorator';
 import { Pagination } from '@app/src/decorator/pagination.decorator';
@@ -99,7 +100,7 @@ export class UserController {
       },
     },
   })
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', imageUploadOptions))
   async uploadAvatarS3(
     @CurrentUserId() userId: string,
     @UploadedFile() file: Express.Multer.File,

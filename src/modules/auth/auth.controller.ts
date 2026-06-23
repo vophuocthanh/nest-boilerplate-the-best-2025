@@ -15,10 +15,10 @@ import { User } from '@prisma/client';
 
 import { Request as ExpressRequest } from 'express';
 
+import { CurrentUser } from '@app/src/common/decorators/current-user.decorator';
 import { Public } from '@app/src/common/decorators/public.decorator';
 import { ApiCommonResponses } from '@app/src/decorator/api-common-responses.decorator';
 import { AuthService } from '@app/src/modules/auth/auth.service';
-import { CurrentUser } from '@app/src/modules/auth/decorator/current-user.decorator';
 import {
   ChangePasswordDto,
   ForgotPasswordDto,
@@ -29,6 +29,7 @@ import { LoginDto } from '@app/src/modules/auth/dto/login.dto';
 import { RefreshTokenDto } from '@app/src/modules/auth/dto/refresh-token.dto';
 import { RegisterDto } from '@app/src/modules/auth/dto/register.dto';
 import { VerifyEmailDto } from '@app/src/modules/auth/dto/verify-code';
+import { AuthResult } from '@app/src/modules/auth/types/auth.types';
 
 @ApiBearerAuth()
 @ApiTags('Authentication')
@@ -50,6 +51,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiCommonResponses('Verify email')
   @Post('verify-email')
   async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
@@ -68,7 +70,9 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('login')
   @ApiCommonResponses('Login')
-  async login(@Body() body: LoginDto): Promise<any> {
+  async login(
+    @Body() body: LoginDto,
+  ): Promise<{ data: AuthResult; message: string }> {
     const result = await this.authService.login(body);
     return {
       data: result,
@@ -91,6 +95,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('forgot-password')
   @ApiCommonResponses('Forgot password')
   async forgotPassword(@Body() body: ForgotPasswordDto): Promise<any> {
@@ -102,6 +107,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Put('reset-password')
   @ApiCommonResponses('Reset password (dùng token từ email)')
   async resetPassword(@Body() body: ResetPasswordDto): Promise<any> {
@@ -157,6 +163,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('resend-verification-email')
   @ApiCommonResponses('Resend verification email')
   async resendVerificationEmail(@Body() body: ResendVerificationEmailDto) {
