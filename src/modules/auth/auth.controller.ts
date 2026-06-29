@@ -98,7 +98,9 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Post('forgot-password')
   @ApiCommonResponses('Forgot password')
-  async forgotPassword(@Body() body: ForgotPasswordDto): Promise<any> {
+  async forgotPassword(
+    @Body() body: ForgotPasswordDto,
+  ): Promise<{ message: string }> {
     const result = await this.authService.forgotPassword(body);
     return {
       ...result,
@@ -110,7 +112,9 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @Put('reset-password')
   @ApiCommonResponses('Reset password (dùng token từ email)')
-  async resetPassword(@Body() body: ResetPasswordDto): Promise<any> {
+  async resetPassword(
+    @Body() body: ResetPasswordDto,
+  ): Promise<{ message: string }> {
     const result = await this.authService.resetPassword(
       body.token,
       body.newPassword,
@@ -127,7 +131,7 @@ export class AuthController {
   async changePassword(
     @CurrentUser() user: User,
     @Body() body: ChangePasswordDto,
-  ): Promise<any> {
+  ): Promise<{ message: string }> {
     const { current_password, password, confirm_password } = body;
     const result = await this.authService.changePassword(
       user,

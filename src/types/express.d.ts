@@ -1,3 +1,4 @@
+/// <reference types="multer" />
 import { User } from '@prisma/client';
 
 declare global {
@@ -5,11 +6,5 @@ declare global {
     interface Request {
       user?: User;
     }
-  }
-}
-
-declare module 'express' {
-  export interface Request {
-    user?: User;
   }
 }

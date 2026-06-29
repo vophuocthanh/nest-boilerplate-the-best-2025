@@ -93,6 +93,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
           message: 'Resource not found',
           error: 'NotFound',
         };
+      case 'P2003':
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          message: 'Related resource does not exist',
+          error: 'ForeignKeyConstraint',
+        };
+      case 'P2014':
+        return {
+          status: HttpStatus.BAD_REQUEST,
+          message: 'The change violates a required relation',
+          error: 'RelationViolation',
+        };
       default:
         return {
           status: HttpStatus.BAD_REQUEST,

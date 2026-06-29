@@ -2,63 +2,56 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { IsEmail, IsNotEmpty, Matches, MinLength } from 'class-validator';
 
+import {
+  PASSWORD_REGEX,
+  PASSWORD_VALIDATION_MESSAGE,
+} from '@app/src/modules/auth/constants/password.constant';
+
 export class ForgotPasswordDto {
-  @ApiProperty({ example: 'phuocthanh2k03@gmail.com' })
+  @ApiProperty({ example: 'email@gmail.com' })
   @IsEmail()
-  email: string;
+  email!: string;
 }
 
 export class ResendVerificationEmailDto {
-  @ApiProperty({ example: 'phuocthanh2k03@gmail.com' })
+  @ApiProperty({ example: 'email@gmail.com' })
   @IsEmail()
-  email: string;
+  email!: string;
 }
 
 export class ResetPasswordDto {
   @ApiProperty({ description: 'Token reset nhận từ email' })
   @IsNotEmpty()
-  token: string;
+  token!: string;
 
   @ApiProperty()
   @IsNotEmpty()
   @MinLength(6)
-  @Matches(/^(?=.*[A-Z])(?=.*\d).+$/, {
-    message:
-      'Password must contain at least one uppercase letter and one number',
-  })
-  newPassword: string;
+  @Matches(PASSWORD_REGEX, { message: PASSWORD_VALIDATION_MESSAGE })
+  newPassword!: string;
 
   @ApiProperty()
   @IsNotEmpty()
   @MinLength(6)
-  @Matches(/^(?=.*[A-Z])(?=.*\d).+$/, {
-    message:
-      'Password must contain at least one uppercase letter and one number',
-  })
-  confirm_password: string;
+  @Matches(PASSWORD_REGEX, { message: PASSWORD_VALIDATION_MESSAGE })
+  confirm_password!: string;
 }
 
 export class ChangePasswordDto {
   @ApiProperty()
   @IsNotEmpty()
   @MinLength(6)
-  current_password: string;
+  current_password!: string;
 
   @ApiProperty()
   @IsNotEmpty()
   @MinLength(6)
-  @Matches(/^(?=.*[A-Z])(?=.*\d).+$/, {
-    message:
-      'Password must contain at least one uppercase letter and one number',
-  })
-  password: string;
+  @Matches(PASSWORD_REGEX, { message: PASSWORD_VALIDATION_MESSAGE })
+  password!: string;
 
   @ApiProperty()
   @IsNotEmpty()
   @MinLength(6)
-  @Matches(/^(?=.*[A-Z])(?=.*\d).+$/, {
-    message:
-      'Password must contain at least one uppercase letter and one number',
-  })
-  confirm_password: string;
+  @Matches(PASSWORD_REGEX, { message: PASSWORD_VALIDATION_MESSAGE })
+  confirm_password!: string;
 }

@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
+
+import { Injectable } from '@nestjs/common';
 
 export interface SendMailOptions {
   to: string;
   subject: string;
   template: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 @Injectable()

@@ -13,7 +13,7 @@ import { validationExceptionFactory } from './common/pipes/validation-exception.
 import { loggerMiddleware } from './middlewares/logger.middleware';
 
 const API_PREFIX = 'api';
-const PORT = Number(process.env.PORT) || 3001;
+const PORT = Number(process.env.PORT) || 4040;
 const BODY_LIMIT = '1mb';
 
 async function bootstrap() {

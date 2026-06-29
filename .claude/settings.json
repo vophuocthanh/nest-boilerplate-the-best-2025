@@ -38,7 +38,12 @@
       "Bash(pnpm install *)",
       "Bash(npx eslint *)",
       "Bash(npx tsc *)",
-      "Bash(echo \"eslint exit=$?\")"
+      "Bash(echo \"eslint exit=$?\")",
+      "Bash(rm -f src/enums/index.ts src/helpers/config.ts src/utils/date-utils.ts)",
+      "Bash(rmdir src/enums)",
+      "Bash(rmdir src/utils)",
+      "Bash(pnpm build *)",
+      "Bash(echo \"=== eslint exit: $? ===\")"
     ],
     "additionalDirectories": [
       "/private/tmp"

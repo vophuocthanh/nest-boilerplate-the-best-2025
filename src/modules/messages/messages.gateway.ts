@@ -34,7 +34,15 @@ export class MessagesGateway
   server!: Server;
 
   private readonly logger = new Logger(MessagesGateway.name);
-  private connectedClients: Map<string, Socket> = new Map();
+  private connectedClients: Map<string, Set<Socket>> = new Map();
+
+  private emitToUser(userId: string, event: string, payload: unknown): void {
+    const sockets = this.connectedClients.get(userId);
+    if (!sockets) return;
+    for (const socket of sockets) {
+      socket.emit(event, payload);
+    }
+  }
 
   constructor(
     private readonly messageService: MessageService,
@@ -59,7 +67,9 @@ export class MessagesGateway
 
       // Lưu userId đã xác thực vào handshake để các handler khác dùng lại
       client.handshake.auth.userId = userId;
-      this.connectedClients.set(userId, client);
+      const sockets = this.connectedClients.get(userId) ?? new Set<Socket>();
+      sockets.add(client);
+      this.connectedClients.set(userId, sockets);
       this.logger.log(`Client connected: ${userId}`);
     } catch (error) {
       this.logger.warn(
@@ -71,10 +81,17 @@ export class MessagesGateway
 
   handleDisconnect(client: Socket) {
     const userId = client.handshake.auth.userId;
-    if (userId) {
-      this.connectedClients.delete(userId);
-      this.logger.log(`Client disconnected: ${userId}`);
+    if (!userId) return;
+
+    const sockets = this.connectedClients.get(userId);
+    if (sockets) {
+      sockets.delete(client);
+      // Chỉ xoá key khi user không còn thiết bị nào online.
+      if (sockets.size === 0) {
+        this.connectedClients.delete(userId);
+      }
     }
+    this.logger.log(`Client disconnected: ${userId}`);
   }
 
   // Lấy userId đã xác thực ở handleConnection; socket chưa auth đã bị disconnect.
@@ -114,11 +131,8 @@ export class MessagesGateway
         receiverId,
       });
 
-      // Send to receiver if online
-      const receiverSocket = this.connectedClients.get(receiverId);
-      if (receiverSocket) {
-        receiverSocket.emit('newMessage', message);
-      }
+      // Gửi tới mọi thiết bị của người nhận đang online
+      this.emitToUser(receiverId, 'newMessage', message);
 
       // Send confirmation to sender
       client.emit('messageSent', message);
@@ -146,11 +160,11 @@ export class MessagesGateway
         userId,
       );
 
-      // Notify sender that their message was read
-      const senderSocket = this.connectedClients.get(message.senderId);
-      if (senderSocket) {
-        senderSocket.emit('messageRead', { messageId, readBy: userId });
-      }
+      // Báo cho mọi thiết bị của người gửi rằng tin nhắn đã được đọc
+      this.emitToUser(message.senderId, 'messageRead', {
+        messageId,
+        readBy: userId,
+      });
 
       return message;
     } catch (error) {

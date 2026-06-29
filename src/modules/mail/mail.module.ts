@@ -13,9 +13,11 @@ import { MailService } from './mail.service';
     MailerModule.forRootAsync({
       useFactory: async (configService: ConfigService) => ({
         transport: {
-          host: configService.get('MAIL_HOST'),
-          port: configService.get('MAIL_PORT'),
-          secure: configService.get('MAIL_SECURE') === 'true',
+          host: configService.get<string>('MAIL_HOST'),
+          port: configService.get<number>('MAIL_PORT'),
+          // MAIL_SECURE đã được Joi ép về boolean ở env.validation,
+          // nên đọc thẳng kiểu boolean thay vì so sánh chuỗi 'true'.
+          secure: configService.get<boolean>('MAIL_SECURE') ?? false,
           auth: {
             user: configService.get('MAIL_USER'),
             pass: configService.get('MAIL_PASSWORD'),

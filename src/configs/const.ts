@@ -1,13 +1,4 @@
-export const USER_FIELDS = {
-  id: true,
-  email: true,
-  name: true,
-  avatar: true,
-  role: true,
-} as const;
-
 export const IMAGE_FOLDER = 'images';
-export const SORT_BY_CREATE_AT = 'createAt';
 
 export const USER_SELECT = {
   id: true,

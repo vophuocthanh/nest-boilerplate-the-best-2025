@@ -1,9 +1,8 @@
 import { PaginationResponse } from '@app/src/core/model/pagination-response';
 
-/** Delegate tối thiểu mà mọi Prisma model đều có (user, role, message...). */
 interface PrismaModelDelegate<T> {
-  findMany: (args: any) => Promise<T[]>;
-  count: (args: any) => Promise<number>;
+  findMany(args: any): Promise<T[]>;
+  count(args: any): Promise<number>;
 }
 
 interface PaginateArgs {
@@ -17,8 +16,7 @@ interface PaginateArgs {
 }
 
 /**
- * Helper phân trang dùng chung cho mọi Prisma model:
- * chạy findMany + count song song và bọc kết quả theo format phân trang chuẩn.
+ * run findMany + count parallel and wrapped result follow format pagination standard.
  */
 export async function paginate<T>(
   delegate: PrismaModelDelegate<T>,
@@ -32,7 +30,7 @@ export async function paginate<T>(
     skip,
     take: itemsPerPage,
   };
-  // select và include không được dùng đồng thời trong Prisma.
+  // select and include not use simultaneously in Prisma.
   if (select) findArgs.select = select;
   else if (include) findArgs.include = include;
 

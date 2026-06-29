@@ -14,29 +14,19 @@ export class RoleService {
 
   async getRoles(filter: RoleDto): Promise<RoleResponseType> {
     const search = filter.search || '';
-
-    const roles = await this.prisma.role.findMany({
-      where: {
-        name: {
-          contains: search,
-          mode: 'insensitive',
-        },
+    const where = {
+      name: {
+        contains: search,
+        mode: 'insensitive' as const,
       },
-    });
-
-    const total = await this.prisma.role.count({
-      where: {
-        name: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      },
-    });
-
-    return {
-      data: roles,
-      total,
     };
+
+    const [data, total] = await Promise.all([
+      this.prisma.role.findMany({ where }),
+      this.prisma.role.count({ where }),
+    ]);
+
+    return { data, total };
   }
 
   async deleteRole(id: string) {

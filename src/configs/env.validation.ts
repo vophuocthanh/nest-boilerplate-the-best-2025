@@ -8,7 +8,7 @@ export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'production', 'test')
     .default('development'),
-  PORT: Joi.number().default(3001),
+  PORT: Joi.number().default(4040),
 
   // Database
   DATABASE_URL: Joi.string().required(),
@@ -32,7 +32,7 @@ export const envValidationSchema = Joi.object({
   MAIL_TRANSPORT: Joi.string().optional(),
   MAIL_FROM: Joi.string().optional(),
   MAIL_HOST: Joi.string().optional(),
-  MAIL_PORT: Joi.number().optional(),
+  MAIL_PORT: Joi.number().port().optional(),
   MAIL_SECURE: Joi.boolean().optional(),
   MAIL_USER: Joi.string().optional(),
   MAIL_PASSWORD: Joi.string().optional(),

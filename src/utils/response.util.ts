@@ -13,25 +13,6 @@ export class ResponseUtil {
     };
   }
 
-  static paginate<T>(
-    data: T[],
-    total: number,
-    currentPage: number,
-    itemsPerPage: number,
-    message: string = 'Success',
-  ): PaginationResponse<T[]> {
-    const totalPages = Math.ceil(total / itemsPerPage);
-    return {
-      data,
-      total,
-      currentPage,
-      itemsPerPage,
-      totalPages,
-      message,
-      status: 200,
-    };
-  }
-
   // Format any response with excluded fields
   static formatResponse<T>(data: T, excludeFields: string[] = []): T {
     if (Array.isArray(data)) {

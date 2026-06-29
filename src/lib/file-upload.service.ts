@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -12,6 +13,7 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 
 @Injectable()
 export class FileUploadService {
+  private readonly logger = new Logger(FileUploadService.name);
   private readonly s3: S3Client;
   private readonly region: string;
   private readonly bucket: string;
@@ -50,6 +52,12 @@ export class FileUploadService {
       );
       return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${fileKey}`;
     } catch (error) {
+      // Log nguyên nhân thật (credentials/bucket/network) để còn debug,
+      // nhưng không lộ chi tiết nội bộ ra response cho client.
+      this.logger.error(
+        `Upload to S3 failed (folder=${folder})`,
+        error instanceof Error ? error.stack : String(error),
+      );
       throw new InternalServerErrorException('Error uploading file to S3');
     }
   }

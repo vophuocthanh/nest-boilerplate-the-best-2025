@@ -9,22 +9,17 @@ import {
 
 import { Prisma, User } from '@prisma/client';
 
-import { FileUploadService } from 'src/lib/file-upload.service';
-import { UpdateUserDto } from 'src/modules/user/dto/user.dto';
-
 import { paginate } from '@app/src/common/helpers/paginate';
 import { USER_SELECT } from '@app/src/configs/const';
 import { PaginationParams } from '@app/src/core/model/pagination-params';
 import { PaginationResponse } from '@app/src/core/model/pagination-response';
-import { Pagination } from '@app/src/decorator/pagination.decorator';
 import { PrismaService } from '@app/src/helpers/prisma.service';
-
-import { ResponseUtil } from '../../utils/response.util';
+import { FileUploadService } from '@app/src/lib/file-upload.service';
+import { UpdateUserDto } from '@app/src/modules/user/dto/user.dto';
+import { ResponseUtil } from '@app/src/utils/response.util';
 
 @Injectable()
 export class UserService {
-  // Chỉ cho phép sort theo các field hợp lệ -> tránh "sortBy" tuỳ tiện
-  // gây PrismaClientValidationError (rơi vào nhánh 500 ở exception filter).
   private static readonly ALLOWED_SORT_FIELDS = [
     'createAt',
     'updateAt',
@@ -37,7 +32,7 @@ export class UserService {
     private fileUploadService: FileUploadService,
   ) {}
 
-  async getAll(@Pagination(['sortBy']) pagination: PaginationParams) {
+  async getAll(pagination: PaginationParams) {
     const { itemsPerPage, skip, search, page, sort, sortBy } = pagination;
     const where: Prisma.UserWhereInput = search
       ? {

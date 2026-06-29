@@ -4,8 +4,18 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { Prisma } from '@prisma/client';
+
 import { PrismaService } from '@app/src/helpers/prisma.service';
 import { CreateMessageDto } from '@app/src/modules/messages/dto/create-message.dto';
+
+const MESSAGE_PARTICIPANT_SELECT = { id: true, name: true, avatar: true };
+const MESSAGE_INCLUDE = {
+  sender: { select: MESSAGE_PARTICIPANT_SELECT },
+  receiver: { select: MESSAGE_PARTICIPANT_SELECT },
+} satisfies Prisma.MessageInclude;
+
+const DEFAULT_MESSAGES_LIMIT = 50;
 
 @Injectable()
 export class MessageService {
@@ -14,64 +24,37 @@ export class MessageService {
   async createMessage(createMessageDto: CreateMessageDto) {
     const { content, senderId, receiverId } = createMessageDto;
 
+    const receiver = await this.prisma.user.findUnique({
+      where: { id: receiverId },
+      select: { id: true },
+    });
+    if (!receiver) {
+      throw new NotFoundException('Receiver not found');
+    }
+
     return this.prisma.message.create({
-      data: {
-        content,
-        senderId,
-        receiverId,
-      },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true,
-          },
-        },
-        receiver: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true,
-          },
-        },
-      },
+      data: { content, senderId, receiverId },
+      include: MESSAGE_INCLUDE,
     });
   }
 
-  async getMessages(userId: string, otherUserId: string) {
+  async getMessages(
+    userId: string,
+    otherUserId: string,
+    take: number = DEFAULT_MESSAGES_LIMIT,
+    skip: number = 0,
+  ) {
     return this.prisma.message.findMany({
       where: {
         OR: [
-          {
-            senderId: userId,
-            receiverId: otherUserId,
-          },
-          {
-            senderId: otherUserId,
-            receiverId: userId,
-          },
+          { senderId: userId, receiverId: otherUserId },
+          { senderId: otherUserId, receiverId: userId },
         ],
       },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true,
-          },
-        },
-        receiver: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
+      include: MESSAGE_INCLUDE,
+      orderBy: { createdAt: 'asc' },
+      take,
+      skip,
     });
   }
 
