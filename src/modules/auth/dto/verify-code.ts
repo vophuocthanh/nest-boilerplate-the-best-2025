@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+
 import { IsEmail, IsNotEmpty, IsString } from 'class-validator';
 
 export class VerifyEmailDto {
@@ -8,7 +9,7 @@ export class VerifyEmailDto {
   })
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email!: string;
 
   @ApiProperty({
     description: 'Mã xác thực được gửi qua email',
@@ -16,7 +17,7 @@ export class VerifyEmailDto {
   })
   @IsString()
   @IsNotEmpty()
-  verificationCode: string;
+  verificationCode!: string;
 }
 
 export interface SendVerificationEmailDto {

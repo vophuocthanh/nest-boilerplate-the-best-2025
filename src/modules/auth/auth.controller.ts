@@ -15,9 +15,9 @@ import { User } from '@prisma/client';
 
 import { Request as ExpressRequest } from 'express';
 
+import { ApiCommonResponses } from '@app/src/common/decorators/api-common-responses.decorator';
 import { CurrentUser } from '@app/src/common/decorators/current-user.decorator';
 import { Public } from '@app/src/common/decorators/public.decorator';
-import { ApiCommonResponses } from '@app/src/decorator/api-common-responses.decorator';
 import { AuthService } from '@app/src/modules/auth/auth.service';
 import {
   ChangePasswordDto,
@@ -80,7 +80,9 @@ export class AuthController {
     };
   }
 
+  // Chống abuse/token-guessing: siết chặt như các route auth nhạy cảm khác
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('refresh-token')
   @ApiCommonResponses('Refresh token (rotation)')
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
@@ -88,6 +90,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('logout')
   @ApiCommonResponses('Logout (thu hồi refresh token)')
   async logout(@Body() body: RefreshTokenDto) {

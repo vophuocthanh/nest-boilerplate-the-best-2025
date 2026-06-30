@@ -125,9 +125,8 @@ export class MessagesGateway
     }
 
     try {
-      const message = await this.messageService.createMessage({
+      const message = await this.messageService.createMessage(senderId, {
         content,
-        senderId,
         receiverId,
       });
 

@@ -4,7 +4,7 @@ import {
   BasePaginationParams,
   PaginationParams,
   SortOrder,
-} from '@app/src/core/model/pagination-params';
+} from '@app/src/common/pagination/pagination-params';
 
 const DEFAULT_ITEMS_PER_PAGE = 10;
 const DEFAULT_PAGE = 1;

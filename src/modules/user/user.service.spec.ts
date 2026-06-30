@@ -1,8 +1,8 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
-import { PrismaService } from '@app/src/helpers/prisma.service';
 import { FileUploadService } from '@app/src/lib/file-upload.service';
+import { PrismaService } from '@app/src/prisma/prisma.service';
 
 import { UserService } from './user.service';
 

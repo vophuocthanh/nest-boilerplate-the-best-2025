@@ -9,12 +9,12 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
-import { ApiCommonResponses } from 'src/decorator/api-common-responses.decorator';
-import { CommonPagination } from 'src/decorator/common-pagination.decorator';
-import { Roles } from 'src/decorator/roles.decorator';
-import { CreateRoleDto } from 'src/modules/role/dto/create.dto';
-import { RoleDto } from 'src/modules/role/dto/role.dto';
-import { RoleService } from 'src/modules/role/role.service';
+import { ApiCommonResponses } from '@app/src/common/decorators/api-common-responses.decorator';
+import { CommonPagination } from '@app/src/common/decorators/common-pagination.decorator';
+import { Roles } from '@app/src/common/decorators/roles.decorator';
+import { CreateRoleDto } from '@app/src/modules/role/dto/create.dto';
+import { RoleDto } from '@app/src/modules/role/dto/role.dto';
+import { RoleService } from '@app/src/modules/role/role.service';
 
 @ApiBearerAuth()
 @ApiTags('Role')

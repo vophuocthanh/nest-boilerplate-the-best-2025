@@ -9,21 +9,14 @@ export class CreateMessageDto {
   })
   @IsString()
   @IsNotEmpty()
-  content: string;
+  content!: string;
 
-  @ApiProperty({
-    description: 'The ID of the sender',
-    example: '123e4567-e89b-12d3-a456-426614174000',
-  })
-  @IsString()
-  @IsNotEmpty()
-  senderId: string;
-
+  // KHÔNG nhận senderId từ client — luôn lấy từ user đã xác thực (chống spoofing).
   @ApiProperty({
     description: 'The ID of the receiver',
     example: '123e4567-e89b-12d3-a456-426614174000',
   })
   @IsString()
   @IsNotEmpty()
-  receiverId: string;
+  receiverId!: string;
 }

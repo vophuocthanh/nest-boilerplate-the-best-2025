@@ -14,20 +14,19 @@ import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 
 import { User } from '@prisma/client';
 
-import { CurrentUserId } from 'src/common/decorators/current-user.decorator';
-import { ApiCommonResponses } from 'src/decorator/api-common-responses.decorator';
-import { AuthenticatedController } from 'src/decorator/authenticated-controller.decorator';
-import { CommonPagination } from 'src/decorator/common-pagination.decorator';
-import { Roles } from 'src/decorator/roles.decorator';
+import { imageUploadOptions } from '@app/src/common/config/multer-image.options';
+import { ApiCommonResponses } from '@app/src/common/decorators/api-common-responses.decorator';
+import { AuthenticatedController } from '@app/src/common/decorators/authenticated-controller.decorator';
+import { CommonPagination } from '@app/src/common/decorators/common-pagination.decorator';
+import { CommonQuery } from '@app/src/common/decorators/common-query.decorator';
+import { CurrentUserId } from '@app/src/common/decorators/current-user.decorator';
+import { Pagination } from '@app/src/common/decorators/pagination.decorator';
+import { Roles } from '@app/src/common/decorators/roles.decorator';
+import { PaginationParams } from '@app/src/common/pagination/pagination-params';
 import {
   UpdateUserDto,
   UpdateUserRoleDto,
-} from 'src/modules/user/dto/user.dto';
-
-import { imageUploadOptions } from '@app/src/common/config/multer-image.options';
-import { PaginationParams } from '@app/src/core/model/pagination-params';
-import { CommonQuery } from '@app/src/decorator/common-query.decorator';
-import { Pagination } from '@app/src/decorator/pagination.decorator';
+} from '@app/src/modules/user/dto/user.dto';
 import { UserService } from '@app/src/modules/user/user.service';
 
 @ApiTags('User')

@@ -46,10 +46,14 @@ export const loggerMiddleware = (
 ) => {
   const start = Date.now();
   const { method, originalUrl, ip } = req;
+  // Correlation id (gắn bởi requestIdMiddleware) để nối 2 dòng log của cùng request
+  const rid = req.id ? `${DIM}[${req.id}]${RESET} ` : '';
 
   const mColor = methodColor(method);
   logger.log(
-    `${mColor}${method.padEnd(6)}${RESET} ${originalUrl} ${DIM}${ip}${RESET}`,
+    `${rid}${mColor}${method.padEnd(
+      6,
+    )}${RESET} ${originalUrl} ${DIM}${ip}${RESET}`,
   );
 
   res.on('finish', () => {
@@ -59,7 +63,9 @@ export const loggerMiddleware = (
       duration >= 100 ? '+' : ''
     }${duration}ms${RESET}`;
     logger.log(
-      `${statusColor(statusCode)}${statusCode}${RESET} ${mColor}${method.padEnd(
+      `${rid}${statusColor(
+        statusCode,
+      )}${statusCode}${RESET} ${mColor}${method.padEnd(
         6,
       )}${RESET} ${originalUrl} ${timing}`,
     );

@@ -43,7 +43,13 @@
       "Bash(rmdir src/enums)",
       "Bash(rmdir src/utils)",
       "Bash(pnpm build *)",
-      "Bash(echo \"=== eslint exit: $? ===\")"
+      "Bash(echo \"=== eslint exit: $? ===\")",
+      "Bash(npx prisma *)",
+      "Bash(npx jest *)",
+      "Bash(git mv *)",
+      "Bash(PORT=4999 node dist/src/main.js)",
+      "Bash(echo \"launched pid $!\")",
+      "Bash(pkill -f \"dist/src/main.js\")"
     ],
     "additionalDirectories": [
       "/private/tmp"

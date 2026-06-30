@@ -1,10 +1,11 @@
 // src/auth/dto/refresh-token.dto.ts
 import { ApiProperty } from '@nestjs/swagger';
 
-import { IsNotEmpty } from 'class-validator';
+import { IsJWT, IsNotEmpty } from 'class-validator';
 
 export class RefreshTokenDto {
   @ApiProperty()
   @IsNotEmpty()
-  refreshToken: string;
+  @IsJWT()
+  refreshToken!: string;
 }

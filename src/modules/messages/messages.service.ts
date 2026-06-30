@@ -6,8 +6,8 @@ import {
 
 import { Prisma } from '@prisma/client';
 
-import { PrismaService } from '@app/src/helpers/prisma.service';
 import { CreateMessageDto } from '@app/src/modules/messages/dto/create-message.dto';
+import { PrismaService } from '@app/src/prisma/prisma.service';
 
 const MESSAGE_PARTICIPANT_SELECT = { id: true, name: true, avatar: true };
 const MESSAGE_INCLUDE = {
@@ -21,8 +21,8 @@ const DEFAULT_MESSAGES_LIMIT = 50;
 export class MessageService {
   constructor(private prisma: PrismaService) {}
 
-  async createMessage(createMessageDto: CreateMessageDto) {
-    const { content, senderId, receiverId } = createMessageDto;
+  async createMessage(senderId: string, createMessageDto: CreateMessageDto) {
+    const { content, receiverId } = createMessageDto;
 
     const receiver = await this.prisma.user.findUnique({
       where: { id: receiverId },

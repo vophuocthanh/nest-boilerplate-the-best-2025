@@ -19,6 +19,11 @@ export const envValidationSchema = Joi.object({
   ACCESS_TOKEN_EXPIRES_IN: Joi.string().default('1d'),
   REFRESH_TOKEN_EXPIRES_IN: Joi.string().default('7d'),
 
+  // Security (tuỳ chọn — có default an toàn)
+  BCRYPT_SALT_ROUNDS: Joi.number().min(10).max(15).default(12),
+  MAX_FAILED_LOGIN_ATTEMPTS: Joi.number().default(5),
+  ACCOUNT_LOCK_MINUTES: Joi.number().default(15),
+
   // CORS (chỉ bắt buộc cấu hình ở production thông qua logic ở main.ts)
   CORS_ORIGIN: Joi.string().allow('').optional(),
 

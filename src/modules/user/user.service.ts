@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ForbiddenException,
   HttpException,
   HttpStatus,
@@ -10,12 +9,12 @@ import {
 import { Prisma, User } from '@prisma/client';
 
 import { paginate } from '@app/src/common/helpers/paginate';
+import { PaginationParams } from '@app/src/common/pagination/pagination-params';
+import { PaginationResponse } from '@app/src/common/pagination/pagination-response';
 import { USER_SELECT } from '@app/src/configs/const';
-import { PaginationParams } from '@app/src/core/model/pagination-params';
-import { PaginationResponse } from '@app/src/core/model/pagination-response';
-import { PrismaService } from '@app/src/helpers/prisma.service';
 import { FileUploadService } from '@app/src/lib/file-upload.service';
 import { UpdateUserDto } from '@app/src/modules/user/dto/user.dto';
+import { PrismaService } from '@app/src/prisma/prisma.service';
 import { ResponseUtil } from '@app/src/utils/response.util';
 
 @Injectable()
@@ -127,18 +126,14 @@ export class UserService {
     userId: string,
     file: Express.Multer.File,
   ): Promise<User> {
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-    });
-    if (!user) {
-      throw new BadRequestException('User not found');
-    }
+    // Không cần findUnique trước: nếu user không tồn tại, update sẽ ném P2025
+    // và được AllExceptionsFilter chuẩn hoá thành 404.
     const avatarUrl = await this.fileUploadService.uploadImageToS3(
       file,
       'avatars',
     );
 
-    return await this.prismaService.user.update({
+    return this.prismaService.user.update({
       where: { id: userId },
       data: { avatar: avatarUrl },
     });

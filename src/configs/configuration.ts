@@ -17,3 +17,17 @@ export const awsConfig = registerAs('aws', () => ({
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   bucket: process.env.AWS_S3_BUCKET_NAME,
 }));
+
+export const googleConfig = registerAs('google', () => ({
+  clientId: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackUrl: process.env.GOOGLE_CALLBACK_URL,
+}));
+
+export const securityConfig = registerAs('security', () => ({
+  // Cost factor cho bcrypt. Mặc định 12 (an toàn cho 2026), có thể chỉnh qua env.
+  bcryptSaltRounds: Number(process.env.BCRYPT_SALT_ROUNDS) || 12,
+  // Khoá tài khoản tạm thời sau N lần đăng nhập sai liên tiếp.
+  maxFailedLoginAttempts: Number(process.env.MAX_FAILED_LOGIN_ATTEMPTS) || 5,
+  accountLockMinutes: Number(process.env.ACCOUNT_LOCK_MINUTES) || 15,
+}));

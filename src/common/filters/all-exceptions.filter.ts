@@ -37,6 +37,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `${request.method} ${request.url}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
+    } else if (status >= HttpStatus.BAD_REQUEST) {
+      // Log 4xx ở mức warn để còn triage bug phía client trong production,
+      // nhưng không kèm stack để tránh nhiễu log.
+      this.logger.warn(
+        `${request.method} ${request.url} -> ${status} ${error}`,
+      );
     }
 
     response.status(status).json({
@@ -45,6 +51,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error,
       timestamp: new Date().toISOString(),
       path: request.url,
+      requestId: request.id,
     });
   }
 
@@ -68,6 +75,24 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       return this.normalizePrisma(exception);
+    }
+
+    // Truy vấn/đối số sai (vd thiếu field bắt buộc) -> lỗi phía client (400)
+    if (exception instanceof Prisma.PrismaClientValidationError) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        message: 'Invalid database query',
+        error: 'BadRequest',
+      };
+    }
+
+    // Không kết nối được DB -> service tạm thời không khả dụng (503)
+    if (exception instanceof Prisma.PrismaClientInitializationError) {
+      return {
+        status: HttpStatus.SERVICE_UNAVAILABLE,
+        message: 'Database is unavailable',
+        error: 'ServiceUnavailable',
+      };
     }
 
     return {

@@ -32,6 +32,10 @@ model User {
   isVerified                Boolean   @default(false)
   role                      Role?     @relation(fields: [roleId], references: [id])
 
+  // Chống brute-force: đếm số lần đăng nhập sai liên tiếp & khoá tạm thời
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
   // Reset password (token được hash trước khi lưu, kèm thời hạn dùng 1 lần)
   resetToken          String?
   resetTokenExpiresAt DateTime?
@@ -87,5 +91,9 @@ model Message {
   isRead Boolean   @default(false)
   readAt DateTime?
 
+  // Index cho truy vấn hội thoại & đếm tin chưa đọc (tránh sequential scan)
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([receiverId, isRead])
   @@map("messages")
 }

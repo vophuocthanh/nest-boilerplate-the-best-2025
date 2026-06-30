@@ -5,10 +5,13 @@ import {
   IsNotEmpty,
   IsOptional,
   Matches,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
 import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
   PASSWORD_REGEX,
   PASSWORD_VALIDATION_MESSAGE,
 } from '@app/src/modules/auth/constants/password.constant';
@@ -16,27 +19,29 @@ import {
 export class RegisterDto {
   @ApiProperty()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
   @IsOptional()
   @Matches(/^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/)
-  phone: string;
+  phone?: string;
 
   @ApiProperty()
   @IsEmail()
-  email: string;
+  email!: string;
 
   @ApiProperty()
   @IsNotEmpty()
-  @MinLength(6)
+  @MinLength(PASSWORD_MIN_LENGTH)
+  @MaxLength(PASSWORD_MAX_LENGTH)
   @Matches(PASSWORD_REGEX, { message: PASSWORD_VALIDATION_MESSAGE })
-  password: string;
+  password!: string;
 
   @ApiProperty()
   @IsNotEmpty()
-  @MinLength(6)
-  confirmPassword: string;
+  @MinLength(PASSWORD_MIN_LENGTH)
+  @MaxLength(PASSWORD_MAX_LENGTH)
+  confirmPassword!: string;
 
   @IsOptional()
   verificationCode?: string;

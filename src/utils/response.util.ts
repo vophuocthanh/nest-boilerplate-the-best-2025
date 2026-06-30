@@ -1,4 +1,4 @@
-import { PaginationResponse } from '@app/src/core/model/pagination-response';
+import { PaginationResponse } from '@app/src/common/pagination/pagination-response';
 
 export class ResponseUtil {
   static success<T>(

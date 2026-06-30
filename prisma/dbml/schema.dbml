@@ -20,6 +20,8 @@ Table users {
   verificationCodeExpiresAt DateTime
   isVerified Boolean [not null, default: false]
   role roles
+  failedLoginAttempts Int [not null, default: 0]
+  lockedUntil DateTime
   resetToken String
   resetTokenExpiresAt DateTime
   sentMessages messages [not null]

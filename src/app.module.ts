@@ -1,17 +1,22 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { RolesGuard } from './common/guards/roles.guard';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
-import { awsConfig, jwtConfig } from './configs/configuration';
+import {
+  awsConfig,
+  googleConfig,
+  jwtConfig,
+  securityConfig,
+} from './configs/configuration';
 import { envValidationSchema } from './configs/env.validation';
-import { RolesGuard } from './guard/roles.guard';
-import { PrismaModule } from './helpers/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './modules/mail/mail.module';
@@ -19,17 +24,20 @@ import { MessagesModule } from './modules/messages/messages.module';
 import { RoleModule } from './modules/role/role.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { UserModule } from './modules/user/user.module';
+import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [jwtConfig, awsConfig],
+      load: [jwtConfig, awsConfig, googleConfig, securityConfig],
       validationSchema: envValidationSchema,
       validationOptions: {
         abortEarly: false,
       },
     }),
+    // Cho phép dùng @Cron (vd: dọn refresh token hết hạn)
+    ScheduleModule.forRoot(),
     // Rate limit toàn cục: tối đa 100 request / 60s cho mỗi IP
     ThrottlerModule.forRoot([
       {

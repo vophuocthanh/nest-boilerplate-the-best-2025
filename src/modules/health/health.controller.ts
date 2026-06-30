@@ -4,6 +4,7 @@ import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 import { SkipThrottle } from '@nestjs/throttler';
 
 import { Public } from '@app/src/common/decorators/public.decorator';
+import { SkipTransform } from '@app/src/common/decorators/skip-transform.decorator';
 
 import { PrismaHealthIndicator } from './prisma.health';
 
@@ -18,6 +19,7 @@ export class HealthController {
   @Public()
   @Get()
   @SkipThrottle()
+  @SkipTransform()
   @HealthCheck()
   check() {
     return this.health.check([() => this.prismaHealth.isHealthy('database')]);

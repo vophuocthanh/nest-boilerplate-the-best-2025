@@ -6,10 +6,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
 
-import { PrismaService } from '@app/src/helpers/prisma.service';
 import { MailService } from '@app/src/modules/mail/mail.service';
+import { PrismaService } from '@app/src/prisma/prisma.service';
 
 import { AuthService } from './auth.service';
+import { PasswordService } from './services/password.service';
+import { RegistrationService } from './services/registration.service';
+import { TokenService } from './services/token.service';
 
 jest.mock('bcrypt');
 
@@ -67,6 +70,10 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
+        // Các service con dùng chung mock Prisma/Jwt/Mail/Config
+        TokenService,
+        RegistrationService,
+        PasswordService,
         { provide: PrismaService, useValue: prisma },
         { provide: JwtService, useValue: jwt },
         { provide: MailService, useValue: mail },
@@ -154,13 +161,25 @@ describe('AuthService', () => {
       );
     });
 
-    it('ném lỗi khi token đã bị thu hồi', async () => {
+    it('phát hiện reuse: token đã thu hồi nhưng bị dùng lại -> thu hồi toàn bộ session', async () => {
       jwt.verify.mockReturnValue({ id: '1' });
       prisma.refreshToken.findUnique.mockResolvedValue({
         id: 'rt1',
+        userId: '1',
         revoked: true,
         expiresAt: new Date(Date.now() + 100000),
       });
+      await expect(service.refreshToken(dto)).rejects.toThrow('reuse detected');
+      // Toàn bộ refresh token của user bị thu hồi
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: '1' },
+        data: { revoked: true },
+      });
+    });
+
+    it('ném lỗi khi token không tồn tại hoặc đã hết hạn', async () => {
+      jwt.verify.mockReturnValue({ id: '1' });
+      prisma.refreshToken.findUnique.mockResolvedValue(null);
       await expect(service.refreshToken(dto)).rejects.toThrow(
         'invalid or has been revoked',
       );
