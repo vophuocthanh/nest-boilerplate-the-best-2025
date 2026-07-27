@@ -43,6 +43,7 @@ export class UserController {
     return user as Required<Omit<User, 'password' | 'confirmPassword'>>;
   }
 
+  @Roles('ADMIN')
   @Get('/count-user')
   @ApiCommonResponses('Lấy ra số lượng user')
   async countUser(): Promise<{ data: { total: number } }> {

@@ -29,6 +29,7 @@ export class RoleController {
     return this.rolesService.createRole(data);
   }
 
+  @Roles('ADMIN')
   @CommonPagination()
   @Get()
   @ApiCommonResponses('Lấy tất cả các role')

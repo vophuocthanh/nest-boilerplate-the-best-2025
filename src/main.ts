@@ -6,7 +6,7 @@ import {
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
-import { json, urlencoded } from 'express';
+import { NextFunction, Request, Response, json, urlencoded } from 'express';
 import helmet from 'helmet';
 
 import { setupSwagger } from '@app/src/configs/swagger.config';
@@ -18,6 +18,7 @@ import { loggerMiddleware } from './middlewares/logger.middleware';
 import { requestIdMiddleware } from './middlewares/request-id.middleware';
 
 const API_PREFIX = 'api';
+const SWAGGER_PATH_PREFIX = '/docs';
 const PORT = Number(process.env.PORT) || 4040;
 const BODY_LIMIT = '1mb';
 
@@ -39,14 +40,31 @@ async function bootstrap() {
   app.use(json({ limit: BODY_LIMIT }));
   app.use(urlencoded({ extended: true, limit: BODY_LIMIT }));
 
-  // Security headers
-  app.use(helmet());
+  // Security headers. Strict CSP for the API; on Swagger UI (/docs) we disable CSP
+  // because Swagger UI (and our theme-toggle) rely on inline scripts that the
+  // default `script-src 'self'` policy would otherwise block.
+  const strictHelmet = helmet();
+  const docsHelmet = helmet({ contentSecurityPolicy: false });
+  app.use((req: Request, res: Response, next: NextFunction) =>
+    req.path.startsWith(SWAGGER_PATH_PREFIX)
+      ? docsHelmet(req, res, next)
+      : strictHelmet(req, res, next),
+  );
   app.enableCors(buildCorsOptions());
+
+  // Trust proxy: cho phép Express lấy IP thật của client khi đứng sau nginx/load balancer.
+  // Cần cho rate limiting (ThrottlerGuard) và logging IP chính xác trong production.
+  if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+  }
 
   // Đóng kết nối (Prisma, ...) an toàn khi nhận SIGTERM/SIGINT
   app.enableShutdownHooks();
 
-  setupSwagger(app);
+  // Chỉ bật Swagger UI ở môi trường dev/test — tránh lộ API spec trong production
+  if (process.env.NODE_ENV !== 'production') {
+    setupSwagger(app);
+  }
 
   app.useGlobalPipes(
     new ValidationPipe({

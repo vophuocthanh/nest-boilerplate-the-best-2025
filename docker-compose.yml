@@ -29,6 +29,7 @@ services:
     env_file:
       - .env
     environment:
+      PORT: 3001
       # Trỏ về service postgres ở trên cho môi trường dev local.
       # Bỏ dòng này nếu muốn dùng DATABASE_URL trong .env (vd: Neon).
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-nestjs_boilerplate}?schema=public

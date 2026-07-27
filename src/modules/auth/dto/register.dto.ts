@@ -42,7 +42,4 @@ export class RegisterDto {
   @MinLength(PASSWORD_MIN_LENGTH)
   @MaxLength(PASSWORD_MAX_LENGTH)
   confirmPassword!: string;
-
-  @IsOptional()
-  verificationCode?: string;
 }

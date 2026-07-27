@@ -1,5 +1,4 @@
 import {
-  Controller,
   Post,
   UploadedFile,
   UploadedFiles,
@@ -15,11 +14,12 @@ import {
 } from '@nestjs/swagger';
 
 import { imageUploadOptions } from '@app/src/common/config/multer-image.options';
+import { AuthenticatedController } from '@app/src/common/decorators/authenticated-controller.decorator';
 
 import { UploadService } from './upload.service';
 
 @ApiTags('File Upload')
-@Controller('upload')
+@AuthenticatedController('upload')
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 

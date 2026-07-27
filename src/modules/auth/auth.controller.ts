@@ -51,7 +51,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 5, ttl: 300000 } })
   @ApiCommonResponses('Verify email')
   @Post('verify-email')
   async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto) {
@@ -169,8 +169,9 @@ export class AuthController {
     };
   }
 
+  // Rate limit chặt: 3 lần / 5 phút — tránh spam email và brute-force code
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 3, ttl: 300000 } })
   @Post('resend-verification-email')
   @ApiCommonResponses('Resend verification email')
   async resendVerificationEmail(@Body() body: ResendVerificationEmailDto) {

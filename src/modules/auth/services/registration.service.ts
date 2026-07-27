@@ -11,6 +11,7 @@ import { PrismaService } from '@app/src/prisma/prisma.service';
 
 import {
   getDefaultRole,
+  hashToken,
   resolveBcryptRounds,
   safeEqual,
 } from '../auth.helpers';
@@ -88,9 +89,10 @@ export class RegistrationService {
       where: { email: userData.email },
     });
 
+    // Always return a generic message so we don't reveal which emails are registered.
     if (existingUser) {
       throw new HttpException(
-        { message: { email: 'Email đã được sử dụng' } },
+        { message: { email: 'Email không hợp lệ hoặc đã được đăng ký' } },
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -134,7 +136,8 @@ export class RegistrationService {
         email: userData.email,
         password: hashedPassword,
         name: userData.name,
-        verificationCode: verificationData.code,
+        // Hash verification code trước khi lưu để tránh lộ plaintext nếu DB bị compromise
+        verificationCode: hashToken(verificationData.code),
         verificationCodeExpiresAt: verificationData.expiresAt,
         isVerified: false,
         role: { connect: { id: roleId } },
@@ -170,7 +173,11 @@ export class RegistrationService {
     user: User,
     code: string,
   ): Promise<void> {
-    if (!user.verificationCode || !safeEqual(user.verificationCode, code)) {
+    // So sánh hash của code nhập vào với hash đã lưu (constant-time)
+    if (
+      !user.verificationCode ||
+      !safeEqual(user.verificationCode, hashToken(code))
+    ) {
       throw new HttpException(
         { message: { code: 'Mã xác thực không đúng' } },
         HttpStatus.BAD_REQUEST,
