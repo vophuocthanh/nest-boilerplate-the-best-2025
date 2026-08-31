@@ -21,7 +21,7 @@ DATABASE_URL=postgresql://...
 ACCESS_TOKEN_KEY=<secret>
 REFRESH_TOKEN_KEY=<secret>
 ```
-App **fail-fast** khi thiếu biến bắt buộc (validate bằng Joi tại [env.validation.ts](../src/configs/env.validation.ts)).
+App **fail-fast** khi thiếu biến bắt buộc (validate bằng Joi tại [env.validation.ts](../src/config/env.validation.ts)).
 
 ## 3. Database & Migration
 

@@ -13,8 +13,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
-import { imageUploadOptions } from '@app/src/common/config/multer-image.options';
-import { AuthenticatedController } from '@app/src/common/decorators/authenticated-controller.decorator';
+import { imageUploadOptions } from '@/config/multer.config';
+import { AuthenticatedController } from '@/shared/decorators/authenticated-controller.decorator';
 
 import { UploadService } from './upload.service';
 

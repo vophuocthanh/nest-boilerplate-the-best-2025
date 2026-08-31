@@ -12,8 +12,14 @@ import {
 
 import { Server, Socket } from 'socket.io';
 
-import { getCorsOrigin } from '@app/src/common/config/cors.config';
-import { MessageService } from '@app/src/modules/messages/messages.service';
+import { getCorsOrigin } from '@/config/cors.config';
+
+import { MessageService } from './messages.service';
+
+type CorsOriginCallback = (
+  err: Error | null,
+  origin?: boolean | string | string[],
+) => void;
 
 // Các events chính trong hệ thống:
 // sendMessage: Gửi tin nhắn mới
@@ -24,7 +30,13 @@ import { MessageService } from '@app/src/modules/messages/messages.service';
 
 @WebSocketGateway({
   cors: {
-    origin: getCorsOrigin(),
+    // Đánh giá LƯỜI: hàm chạy ở mỗi handshake chứ không phải lúc decorator được
+    // evaluate — thời điểm đó ConfigModule chưa nạp `.env`, nên `getCorsOrigin()`
+    // gọi trực tiếp sẽ đọc phải process.env còn rỗng.
+    origin: (
+      _requestOrigin: string | undefined,
+      callback: CorsOriginCallback,
+    ) => callback(null, getCorsOrigin()),
   },
 })
 export class MessagesGateway

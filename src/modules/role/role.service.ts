@@ -1,35 +1,30 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
-import { CreateRoleDto } from '@app/src/modules/role/dto/create.dto';
-import { RoleDto, RoleResponseType } from '@app/src/modules/role/dto/role.dto';
-import { PrismaService } from '@app/src/prisma/prisma.service';
+import { Role } from '@prisma/client';
+
+import { Paginated } from '@/shared/pagination/paginated';
+import { PaginationParams } from '@/shared/pagination/pagination-params';
+
+import { CreateRoleDto } from './dto/create-role.dto';
+import { RoleRepository } from './role.repository';
 
 @Injectable()
 export class RoleService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly roleRepository: RoleRepository) {}
 
-  async createRole(data: CreateRoleDto) {
-    return this.prisma.role.create({ data });
+  createRole(data: CreateRoleDto): Promise<Role> {
+    return this.roleRepository.create(data);
   }
 
-  async getRoles(filter: RoleDto): Promise<RoleResponseType> {
-    const search = filter.search || '';
-    const where = {
-      name: {
-        contains: search,
-        mode: 'insensitive' as const,
-      },
-    };
-
-    const [data, total] = await Promise.all([
-      this.prisma.role.findMany({ where }),
-      this.prisma.role.count({ where }),
-    ]);
-
-    return { data, total };
+  getRoles(params: PaginationParams): Promise<Paginated<Role>> {
+    return this.roleRepository.paginate(params);
   }
 
-  async deleteRole(id: string) {
-    return this.prisma.role.delete({ where: { id } });
+  async deleteRole(id: string): Promise<void> {
+    const role = await this.roleRepository.findById(id);
+    if (!role) {
+      throw new NotFoundException('Role not found');
+    }
+    await this.roleRepository.delete(id);
   }
 }

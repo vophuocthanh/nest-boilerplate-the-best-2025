@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* eslint-disable */
 /**
- * Module generator – tạo nhanh một CRUD module theo đúng convention của dự án.
+ * Module generator – tạo nhanh một CRUD module theo đúng kiến trúc của dự án.
  *
  * Cách dùng:
  *   pnpm gen <ten-module>
@@ -12,13 +12,14 @@
  *   --no-model      Không thêm model vào prisma/schema.prisma
  *   --no-register   Không tự đăng ký module vào src/app.module.ts
  *
- * Mỗi lần chạy sẽ tạo trong src/modules/<ten>:
- *   - <ten>.controller.ts   (CRUD: create / getAll(pagination) / getDetail / update / remove)
- *   - <ten>.service.ts      (dùng PrismaService + ResponseUtil)
+ * Mỗi lần chạy sẽ tạo trong src/modules/<ten> đủ 5 tầng của kiến trúc:
+ *   - <ten>.controller.ts   route + DTO + Swagger, KHÔNG chứa logic
+ *   - <ten>.service.ts      nghiệp vụ, trả DTO thô (envelope do interceptor lo)
+ *   - <ten>.repository.ts   nơi DUY NHẤT chạm bảng của aggregate này
+ *   - <ten>.mapper.ts       entity -> DTO, whitelist field
+ *   - <ten>.constants.ts    whitelist sortBy
  *   - <ten>.module.ts
- *   - dto/create-<ten>.dto.ts   (sẵn các trường: name, description, status)
- *   - dto/update-<ten>.dto.ts   (PartialType)
- *   - dto/<ten>.dto.ts          (filter + response type)
+ *   - dto/{create,update,<ten>-response}.dto.ts
  */
 
 const fs = require('fs');
@@ -63,6 +64,7 @@ const camel = pascal.charAt(0).toLowerCase() + pascal.slice(1); // productCatego
 const kebab = w.join('-'); // product-category
 const snake = w.join('_'); // product_category
 const table = pluralize(snake); // product_categories
+const constName = w.map((x) => x.toUpperCase()).join('_'); // PRODUCT_CATEGORY
 
 const moduleDir = path.join(MODULES_DIR, kebab);
 const dtoDir = path.join(moduleDir, 'dto');
@@ -74,13 +76,14 @@ if (fs.existsSync(moduleDir)) {
 
 // ---------- templates ----------
 const createDto = `import { ApiProperty } from '@nestjs/swagger';
+
 import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class Create${pascal}Dto {
   @ApiProperty({ description: 'Tên', example: 'Example name' })
   @IsNotEmpty()
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ required: false, description: 'Mô tả' })
   @IsOptional()
@@ -101,172 +104,247 @@ import { Create${pascal}Dto } from './create-${kebab}.dto';
 export class Update${pascal}Dto extends PartialType(Create${pascal}Dto) {}
 `;
 
-const filterDto = `import { ${pascal} } from '@prisma/client';
+const responseDto = `import { ApiProperty } from '@nestjs/swagger';
 
-import { PaginationResponse } from '@app/src/core/model/pagination-response';
+/** Hình dạng ${kebab} trả ra client. Chỉ khai báo field thực sự muốn lộ ra. */
+export class ${pascal}Dto {
+  @ApiProperty()
+  id!: string;
 
-export class ${pascal}FilterDto {
-  search?: string;
+  @ApiProperty()
+  name!: string;
+
+  @ApiProperty({ nullable: true })
+  description!: string | null;
+
+  @ApiProperty({ nullable: true })
+  status!: number | null;
+
+  @ApiProperty()
+  createAt!: Date;
+
+  @ApiProperty({ nullable: true, type: String, format: 'date-time' })
+  updateAt!: Date | null;
 }
-
-export type ${pascal}PaginationResponse = PaginationResponse<${pascal}[]>;
 `;
 
-const controller = `import {
-  Body,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Put,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+const constants = `/** Field được phép dùng cho \`sortBy\` khi liệt kê ${kebab}. */
+export const ${constName}_SORT_FIELDS = ['createAt', 'updateAt', 'name'] as const;
+`;
 
-import { ApiCommonResponses } from 'src/decorator/api-common-responses.decorator';
-import { AuthenticatedController } from 'src/decorator/authenticated-controller.decorator';
-import { CommonPagination } from 'src/decorator/common-pagination.decorator';
-import { CommonQuery } from 'src/decorator/common-query.decorator';
+const mapper = `import { ${pascal} } from '@prisma/client';
 
-import { PaginationParams } from '@app/src/core/model/pagination-params';
-import { Pagination } from '@app/src/decorator/pagination.decorator';
-import { HandleAuthGuard } from '@app/src/modules/auth/guard/auth.guard';
+import { ${pascal}Dto } from './dto/${kebab}-response.dto';
 
-import { Create${pascal}Dto } from './dto/create-${kebab}.dto';
-import { Update${pascal}Dto } from './dto/update-${kebab}.dto';
-import { ${pascal}Service } from './${kebab}.service';
+/**
+ * Nguồn sự thật DUY NHẤT cho hình dạng ${kebab} trả ra client.
+ *
+ * Đây là WHITELIST: thêm field nhạy cảm vào schema sẽ mặc định KHÔNG lộ ra.
+ */
+export function to${pascal}Dto(entity: ${pascal}): ${pascal}Dto {
+  return {
+    id: entity.id,
+    name: entity.name,
+    description: entity.description,
+    status: entity.status,
+    createAt: entity.createAt,
+    updateAt: entity.updateAt,
+  };
+}
+`;
 
-@ApiTags('${pascal}')
-@AuthenticatedController('${kebab}')
-export class ${pascal}Controller {
-  constructor(private readonly ${camel}Service: ${pascal}Service) {}
+const repository = `import { Injectable } from '@nestjs/common';
 
-  @UseGuards(HandleAuthGuard)
-  @Post()
-  @ApiCommonResponses('Tạo mới ${kebab}')
-  create(@Body() data: Create${pascal}Dto) {
-    return this.${camel}Service.create(data);
+import { Prisma, ${pascal} } from '@prisma/client';
+
+import { PrismaService } from '@/core/database/prisma.service';
+import { paginate } from '@/shared/pagination/paginate';
+import { Paginated } from '@/shared/pagination/paginated';
+import { PaginationParams } from '@/shared/pagination/pagination-params';
+
+import { ${constName}_SORT_FIELDS } from './${kebab}.constants';
+
+/** Nơi DUY NHẤT truy vấn bảng \`${table}\`. */
+@Injectable()
+export class ${pascal}Repository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  create(data: Prisma.${pascal}CreateInput): Promise<${pascal}> {
+    return this.prisma.${camel}.create({ data });
   }
 
-  @UseGuards(HandleAuthGuard)
-  @CommonQuery('sort', 'Sort order (asc or desc)', ['asc', 'desc'])
-  @CommonQuery('sortBy', 'Field to sort by', ['createAt'])
-  @CommonPagination()
-  @Get()
-  @ApiCommonResponses('Lấy danh sách ${kebab}')
-  getAll(@Pagination(['sortBy']) params: PaginationParams) {
-    return this.${camel}Service.getAll(params);
+  findById(id: string): Promise<${pascal} | null> {
+    return this.prisma.${camel}.findUnique({ where: { id } });
   }
 
-  @UseGuards(HandleAuthGuard)
-  @Get(':id')
-  @ApiCommonResponses('Lấy chi tiết ${kebab}')
-  getDetail(@Param('id') id: string) {
-    return this.${camel}Service.getDetail(id);
+  update(id: string, data: Prisma.${pascal}UpdateInput): Promise<${pascal}> {
+    return this.prisma.${camel}.update({ where: { id }, data });
   }
 
-  @UseGuards(HandleAuthGuard)
-  @Put(':id')
-  @ApiCommonResponses('Cập nhật ${kebab}')
-  update(@Param('id') id: string, @Body() data: Update${pascal}Dto) {
-    return this.${camel}Service.update(id, data);
+  delete(id: string): Promise<${pascal}> {
+    return this.prisma.${camel}.delete({ where: { id } });
   }
 
-  @UseGuards(HandleAuthGuard)
-  @Delete(':id')
-  @ApiCommonResponses('Xóa ${kebab}')
-  remove(@Param('id') id: string) {
-    return this.${camel}Service.remove(id);
+  paginate(params: PaginationParams): Promise<Paginated<${pascal}>> {
+    const where: Prisma.${pascal}WhereInput = params.search
+      ? { name: { contains: params.search, mode: 'insensitive' } }
+      : {};
+
+    return paginate<${pascal}, Prisma.${pascal}WhereInput>(
+      this.prisma.${camel},
+      params,
+      {
+        where,
+        allowedSortFields: ${constName}_SORT_FIELDS,
+        defaultSortField: 'createAt',
+      },
+    );
   }
 }
 `;
 
 const service = `import { Injectable, NotFoundException } from '@nestjs/common';
 
-import { Prisma } from '@prisma/client';
-
-import { PaginationParams } from '@app/src/core/model/pagination-params';
-import { PrismaService } from '@app/src/helpers/prisma.service';
-import { ResponseUtil } from '@app/src/utils/response.util';
+import { Paginated } from '@/shared/pagination/paginated';
+import { PaginationParams } from '@/shared/pagination/pagination-params';
 
 import { Create${pascal}Dto } from './dto/create-${kebab}.dto';
 import { Update${pascal}Dto } from './dto/update-${kebab}.dto';
+import { ${pascal}Dto } from './dto/${kebab}-response.dto';
+import { to${pascal}Dto } from './${kebab}.mapper';
+import { ${pascal}Repository } from './${kebab}.repository';
 
+/**
+ * Trả về DỮ LIỆU THÔ (DTO), không tự bọc { data, message }.
+ * Envelope response do TransformInterceptor tạo; message khai báo bằng
+ * @ResponseMessage() ở controller.
+ */
 @Injectable()
 export class ${pascal}Service {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(private readonly ${camel}Repository: ${pascal}Repository) {}
 
-  async create(data: Create${pascal}Dto) {
-    const ${camel} = await this.prismaService.${camel}.create({ data });
-    return ResponseUtil.success(${camel}, 'Tạo ${kebab} thành công');
+  async create(data: Create${pascal}Dto): Promise<${pascal}Dto> {
+    return to${pascal}Dto(await this.${camel}Repository.create(data));
   }
 
-  async getAll(pagination: PaginationParams) {
-    const { itemsPerPage, skip, search, page, sort, sortBy } = pagination;
-
-    const where: Prisma.${pascal}WhereInput = search
-      ? { OR: [{ name: { contains: search, mode: 'insensitive' } }] }
-      : {};
-
-    const orderBy: Prisma.${pascal}OrderByWithRelationInput =
-      sort && sortBy ? { [sortBy as string]: sort } : { createAt: 'desc' };
-
-    const data = await this.prismaService.${camel}.findMany({
-      where,
-      skip,
-      take: itemsPerPage,
-      orderBy,
-    });
-
-    const total = await this.prismaService.${camel}.count({ where });
-
-    return ResponseUtil.paginate(data, total, page, itemsPerPage);
+  getAll(params: PaginationParams): Promise<Paginated<${pascal}Dto>> {
+    return this.${camel}Repository.paginate(params).then((page) => ({
+      items: page.items.map(to${pascal}Dto),
+      meta: page.meta,
+    }));
   }
 
-  async getDetail(id: string) {
-    const ${camel} = await this.prismaService.${camel}.findUnique({
-      where: { id },
-    });
+  async getDetail(id: string): Promise<${pascal}Dto> {
+    return to${pascal}Dto(await this.findOrFail(id));
+  }
 
-    if (!${camel}) {
+  async update(id: string, data: Update${pascal}Dto): Promise<${pascal}Dto> {
+    await this.findOrFail(id);
+    return to${pascal}Dto(await this.${camel}Repository.update(id, data));
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.findOrFail(id);
+    await this.${camel}Repository.delete(id);
+  }
+
+  private async findOrFail(id: string) {
+    const entity = await this.${camel}Repository.findById(id);
+    if (!entity) {
       throw new NotFoundException('${pascal} không tồn tại');
     }
+    return entity;
+  }
+}
+`;
 
-    return ResponseUtil.success(${camel}, 'Lấy chi tiết ${kebab} thành công');
+const controller = `import {
+  Body,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Put,
+} from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
+
+import { ApiCommonResponses } from '@/shared/decorators/api-common-responses.decorator';
+import { AuthenticatedController } from '@/shared/decorators/authenticated-controller.decorator';
+import { CommonPagination } from '@/shared/decorators/common-pagination.decorator';
+import { Pagination } from '@/shared/decorators/pagination.decorator';
+import { ResponseMessage } from '@/shared/decorators/response-message.decorator';
+import { Paginated } from '@/shared/pagination/paginated';
+import { PaginationParams } from '@/shared/pagination/pagination-params';
+
+import { Create${pascal}Dto } from './dto/create-${kebab}.dto';
+import { Update${pascal}Dto } from './dto/update-${kebab}.dto';
+import { ${pascal}Dto } from './dto/${kebab}-response.dto';
+import { ${constName}_SORT_FIELDS } from './${kebab}.constants';
+import { ${pascal}Service } from './${kebab}.service';
+
+// JwtAuthGuard là global (@Public() để mở route công khai) -> không cần @UseGuards.
+@ApiTags('${pascal}')
+@AuthenticatedController('${kebab}')
+export class ${pascal}Controller {
+  constructor(private readonly ${camel}Service: ${pascal}Service) {}
+
+  @Post()
+  @ApiCommonResponses('Tạo mới ${kebab}')
+  @ResponseMessage('Tạo ${kebab} thành công')
+  create(@Body() data: Create${pascal}Dto): Promise<${pascal}Dto> {
+    return this.${camel}Service.create(data);
   }
 
-  async update(id: string, data: Update${pascal}Dto) {
-    await this.getDetail(id);
-
-    const ${camel} = await this.prismaService.${camel}.update({
-      where: { id },
-      data,
-    });
-
-    return ResponseUtil.success(${camel}, 'Cập nhật ${kebab} thành công');
+  @Get()
+  @ApiCommonResponses('Lấy danh sách ${kebab}')
+  @CommonPagination(${constName}_SORT_FIELDS)
+  getAll(
+    @Pagination() params: PaginationParams,
+  ): Promise<Paginated<${pascal}Dto>> {
+    return this.${camel}Service.getAll(params);
   }
 
-  async remove(id: string) {
-    await this.getDetail(id);
+  @Get(':id')
+  @ApiCommonResponses('Lấy chi tiết ${kebab}')
+  getDetail(@Param('id') id: string): Promise<${pascal}Dto> {
+    return this.${camel}Service.getDetail(id);
+  }
 
-    await this.prismaService.${camel}.delete({ where: { id } });
+  @Put(':id')
+  @ApiCommonResponses('Cập nhật ${kebab}')
+  @ResponseMessage('Cập nhật ${kebab} thành công')
+  update(
+    @Param('id') id: string,
+    @Body() data: Update${pascal}Dto,
+  ): Promise<${pascal}Dto> {
+    return this.${camel}Service.update(id, data);
+  }
 
-    return { message: 'Xóa ${kebab} thành công' };
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiCommonResponses('Xóa ${kebab}')
+  @ResponseMessage('Xóa ${kebab} thành công')
+  remove(@Param('id') id: string): Promise<void> {
+    return this.${camel}Service.remove(id);
   }
 }
 `;
 
 const moduleFile = `import { Module } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-
-import { PrismaService } from '@app/src/helpers/prisma.service';
 
 import { ${pascal}Controller } from './${kebab}.controller';
+import { ${pascal}Repository } from './${kebab}.repository';
 import { ${pascal}Service } from './${kebab}.service';
 
+// PrismaService đến từ PrismaModule (@Global) -> không khai báo lại ở đây,
+// tránh tạo instance trùng lặp.
 @Module({
   controllers: [${pascal}Controller],
-  providers: [${pascal}Service, PrismaService, JwtService],
+  providers: [${pascal}Service, ${pascal}Repository],
+  // Mở export khi module khác cần chạm aggregate này (đi qua repository).
+  exports: [${pascal}Repository],
 })
 export class ${pascal}Module {}
 `;
@@ -277,10 +355,13 @@ fs.mkdirSync(dtoDir, { recursive: true });
 const files = [
   [path.join(moduleDir, `${kebab}.controller.ts`), controller],
   [path.join(moduleDir, `${kebab}.service.ts`), service],
+  [path.join(moduleDir, `${kebab}.repository.ts`), repository],
+  [path.join(moduleDir, `${kebab}.mapper.ts`), mapper],
+  [path.join(moduleDir, `${kebab}.constants.ts`), constants],
   [path.join(moduleDir, `${kebab}.module.ts`), moduleFile],
   [path.join(dtoDir, `create-${kebab}.dto.ts`), createDto],
   [path.join(dtoDir, `update-${kebab}.dto.ts`), updateDto],
-  [path.join(dtoDir, `${kebab}.dto.ts`), filterDto],
+  [path.join(dtoDir, `${kebab}-response.dto.ts`), responseDto],
 ];
 
 files.forEach(([file, content]) => {

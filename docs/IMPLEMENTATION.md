@@ -6,25 +6,33 @@ Mục tiêu: AI/dev không phát minh lại — luôn tái sử dụng pattern d
 ---
 
 ## 1. Chuẩn hoá Response — `TransformInterceptor`
-📁 [src/common/interceptors/transform.interceptor.ts](../src/common/interceptors/transform.interceptor.ts) · đăng ký global tại `app.module.ts`.
+📁 [core/interceptors/transform.interceptor.ts](../src/core/interceptors/transform.interceptor.ts) · đăng ký global tại [core.module.ts](../src/core/core.module.ts).
 
-Mọi response được bọc thành:
+Đây là **nơi duy nhất** tạo envelope. Service/controller không được tự bọc.
+
 ```jsonc
 { "statusCode": 200, "message": "Success", "data": <payload>, "meta?": { ... } }
 ```
 
-**Controller chỉ cần trả:**
-- Dữ liệu thô → `data` = dữ liệu, `message` = `"Success"`.
-- `{ data, message }` → message tuỳ biến.
-- `ResponseUtil.paginate(...)` → tự tách `total/page/...` vào `meta`.
+Chỉ có hai nhánh, không heuristic:
+
+| Controller trả về | Kết quả |
+|---|---|
+| Dữ liệu thô (DTO, mảng, `void`) | `data` = giá trị đó (hoặc `null`) |
+| `Paginated<T>` = `{ items, meta }` | `data` = `items`, `meta` = `meta` |
+
+- Message tuỳ biến → **`@ResponseMessage('AUTH.LOGIN_SUCCESS')`**.
+- Cần giữ nguyên payload gốc → **`@SkipTransform()`** (vd health-check của Terminus).
 
 ---
 
 ## 2. Chuẩn hoá Lỗi — `AllExceptionsFilter`
-📁 [src/common/filters/all-exceptions.filter.ts](../src/common/filters/all-exceptions.filter.ts) · global.
+📁 [core/filters/all-exceptions.filter.ts](../src/core/filters/all-exceptions.filter.ts) · global.
 
-- Bắt `HttpException`, lỗi Prisma (P2002 → 409, P2025 → 404) và lỗi không lường trước (→ 500).
-- Output: `{ statusCode, message, error, timestamp, path }`.
+- Bắt `HttpException`, lỗi Prisma (P2002 → 409, P2025 → 404, P2003/P2014 → 400,
+  `PrismaClientValidationError` → 400, `PrismaClientInitializationError` → 503) và lỗi
+  không lường trước (→ 500).
+- Output: `{ statusCode, message, error, timestamp, path, requestId }`.
 - Lỗi validation đi qua `validationExceptionFactory` → `{ message: { field: '...' } }`.
 
 **Cách dùng:** chỉ cần `throw` exception, không tự xử lý.
@@ -36,19 +44,21 @@ Mọi response được bọc thành:
 | Thành phần | File | Dùng để |
 |---|---|---|
 | `JwtStrategy` | [modules/auth/strategies/jwt.strategy.ts](../src/modules/auth/strategies/jwt.strategy.ts) | Validate access token |
-| `JwtAuthGuard` (global) | [common/guards/jwt-auth.guard.ts](../src/common/guards/jwt-auth.guard.ts) | Bảo vệ mọi route mặc định |
-| `@Public()` | [common/decorators/public.decorator.ts](../src/common/decorators/public.decorator.ts) | Mở route công khai |
-| `@Roles()` + `RolesGuard` | [guard/roles.guard.ts](../src/guard/roles.guard.ts) | Giới hạn theo vai trò |
-| `@CurrentUserId()` | [decorator/current-user-id.decorator.ts](../src/decorator/current-user-id.decorator.ts) | Lấy id user hiện tại |
-| `@CurrentUser()` | [modules/auth/decorator/current-user.decorator.ts](../src/modules/auth/decorator/current-user.decorator.ts) | Lấy payload JWT |
-| `WsJwtAuthGuard` | [auth/guards/ws-jwt-auth.guard.ts](../src/auth/guards/ws-jwt-auth.guard.ts) | Xác thực WebSocket |
+| `JwtAuthGuard` (global) | [core/guards/jwt-auth.guard.ts](../src/core/guards/jwt-auth.guard.ts) | Bảo vệ mọi route mặc định |
+| `RolesGuard` (global) | [core/guards/roles.guard.ts](../src/core/guards/roles.guard.ts) | Thực thi `@Roles()` |
+| `@Public()` | [shared/decorators/public.decorator.ts](../src/shared/decorators/public.decorator.ts) | Mở route công khai |
+| `@Roles('ADMIN')` | [shared/decorators/roles.decorator.ts](../src/shared/decorators/roles.decorator.ts) | Giới hạn theo vai trò |
+| `@CurrentUserId()` / `@CurrentUser()` | [shared/decorators/current-user.decorator.ts](../src/shared/decorators/current-user.decorator.ts) | Lấy id / payload JWT |
+| `@AuthenticatedController('path')` | [shared/decorators/authenticated-controller.decorator.ts](../src/shared/decorators/authenticated-controller.decorator.ts) | `@Controller` + `@ApiBearerAuth` |
+| `JwtCoreModule` | [core/jwt/jwt-core.module.ts](../src/core/jwt/jwt-core.module.ts) | Cấu hình ký JWT — khai báo 1 lần |
+| WebSocket auth | [modules/messages/messages.gateway.ts](../src/modules/messages/messages.gateway.ts) | Verify token trong `handleConnection` |
 
-**Ví dụ endpoint mới (yêu cầu ADMIN):**
 ```ts
 @Roles('ADMIN')
 @Delete(':id')
 @ApiCommonResponses('Xoá bản ghi')
-async remove(@Param('id') id: string, @CurrentUserId() me: string) {
+@ResponseMessage('Xoá thành công')
+remove(@Param('id') id: string, @CurrentUserId() me: string): Promise<void> {
   return this.service.remove(id, me);
 }
 ```
@@ -56,61 +66,98 @@ async remove(@Param('id') id: string, @CurrentUserId() me: string) {
 ---
 
 ## 4. Cấu hình — `ConfigService`
-📁 [src/configs/configuration.ts](../src/configs/configuration.ts) (namespaced) · [src/configs/env.validation.ts](../src/configs/env.validation.ts) (Joi).
+📁 [config/configuration.ts](../src/config/configuration.ts) (namespaced) · [config/env.validation.ts](../src/config/env.validation.ts) (Joi).
 
 **Thêm biến mới:**
 1. Khai báo + validate ở `env.validation.ts`.
-2. Map vào namespace ở `configuration.ts` (`jwt`, `aws`, …) hoặc tạo namespace mới + `load` trong `app.module.ts`.
+2. Map vào namespace ở `configuration.ts` (`jwt`, `aws`, `google`, `security`) hoặc tạo
+   namespace mới + `load` trong `app.module.ts`.
 3. Đọc: `this.configService.get<string>('namespace.key')`.
 
 ---
 
-## 5. Phân trang — `@Pagination()` + `ResponseUtil.paginate`
-📁 [decorator/pagination.decorator.ts](../src/decorator/pagination.decorator.ts) · [utils/response.util.ts](../src/utils/response.util.ts).
+## 5. Phân trang — `@Pagination()` + `paginate()`
+📁 [shared/decorators/pagination.decorator.ts](../src/shared/decorators/pagination.decorator.ts) · [shared/pagination/paginate.ts](../src/shared/pagination/paginate.ts).
 
 ```ts
-async getAll(@Pagination(['sortBy']) p: PaginationParams) {
-  const { itemsPerPage, skip, search, page, sort, sortBy } = p;
-  const where = search ? { name: { contains: search, mode: 'insensitive' } } : {};
-  const [items, total] = await Promise.all([
-    this.prisma.entity.findMany({ where, skip, take: itemsPerPage, select: SELECT }),
-    this.prisma.entity.count({ where }),
-  ]);
-  return ResponseUtil.paginate(items, total, page, itemsPerPage);
+// <feature>.constants.ts — whitelist sortBy
+export const PRODUCT_SORT_FIELDS = ['createAt', 'updateAt', 'name'] as const;
+
+// <feature>.repository.ts
+paginate(params: PaginationParams): Promise<Paginated<Product>> {
+  const where: Prisma.ProductWhereInput = params.search
+    ? { name: { contains: params.search, mode: 'insensitive' } }
+    : {};
+
+  return paginate<Product, Prisma.ProductWhereInput>(this.prisma.product, params, {
+    where,
+    allowedSortFields: PRODUCT_SORT_FIELDS,  // BẮT BUỘC — chặn sortBy tuỳ ý
+    defaultSortField: 'createAt',
+  });
+}
+
+// <feature>.controller.ts
+@Get()
+@CommonPagination(PRODUCT_SORT_FIELDS)
+getAll(@Pagination() params: PaginationParams): Promise<Paginated<ProductDto>> {
+  return this.productService.getAll(params);
 }
 ```
 
----
-
-## 6. Bảo mật trong `AuthService`
-📁 [modules/auth/auth.service.ts](../src/modules/auth/auth.service.ts).
-
-Pattern tái sử dụng:
-- `hashToken()` — hash SHA-256 trước khi lưu token vào DB.
-- `generateVerificationCode()` — `crypto.randomInt` (CSPRNG).
-- Login & forgot-password trả **thông báo chung** (chống account enumeration).
-- Refresh token **rotation + revoke**.
+`paginate()` chạy `findMany` + `count` song song, chặn `itemsPerPage` ở 100.
 
 ---
 
-## 7. Tiện ích khác
+## 6. Không rò rỉ dữ liệu — `*.mapper.ts`
+📁 [modules/user/user.mapper.ts](../src/modules/user/user.mapper.ts) (mẫu tham chiếu).
+
+Mapper là **whitelist**: liệt kê tường minh field được trả ra. Thêm field nhạy cảm vào
+`schema.prisma` sẽ mặc định **không** lộ ra (fail closed).
+
+```ts
+export function toUserDto(user: UserWithOptionalRole): UserDto {
+  return { id: user.id, email: user.email, name: user.name, /* … */ role: user.role?.name ?? null };
+}
+```
+
+❌ Không dùng blacklist kiểu `delete obj.password` — chắc chắn sẽ sót khi schema lớn lên.
+
+---
+
+## 7. Bảo mật trong module `auth`
+
+| Pattern | File |
+|---|---|
+| `hashToken()` — SHA-256 trước khi lưu token vào DB | [auth.crypto.ts](../src/modules/auth/auth.crypto.ts) |
+| `safeEqual()` — so sánh constant-time | [auth.crypto.ts](../src/modules/auth/auth.crypto.ts) |
+| `PasswordHasher` — bcrypt với cost factor từ config | [password-hasher.service.ts](../src/modules/auth/password-hasher.service.ts) |
+| Mã xác thực bằng `crypto.randomInt` (CSPRNG) | [registration.service.ts](../src/modules/auth/services/registration.service.ts) |
+| Rotation + revoke + reuse-detection | [token.service.ts](../src/modules/auth/services/token.service.ts) |
+| Khoá tài khoản khi brute-force | [auth.service.ts](../src/modules/auth/auth.service.ts) |
+| Thông báo chung chống account enumeration | service trả `void`, message ở `@ResponseMessage` |
+
+---
+
+## 8. Tiện ích khác
 
 | Thành phần | File | Ghi chú |
 |---|---|---|
-| `PrismaService` | [helpers/prisma.service.ts](../src/helpers/prisma.service.ts) | Connect/disconnect theo vòng đời module |
-| `FileUploadService` | [lib/file-upload.service.ts](../src/lib/file-upload.service.ts) | Upload S3, đọc config qua ConfigService |
-| `MailService` | [modules/mail/mail.service.ts](../src/modules/mail/mail.service.ts) | Gửi mail theo template Handlebars |
-| `ResponseUtil` | [utils/response.util.ts](../src/utils/response.util.ts) | `paginate`, `success`, `formatUserResponse` |
-| `@ApiCommonResponses` | [decorator/api-common-responses.decorator.ts](../src/decorator/api-common-responses.decorator.ts) | Gom Swagger response chuẩn |
+| `PrismaService` | [core/database/prisma.service.ts](../src/core/database/prisma.service.ts) | Connect/disconnect theo vòng đời module, `@Global` |
+| `StorageService` (port) | [integrations/storage/storage.service.ts](../src/integrations/storage/storage.service.ts) | Inject **class trừu tượng** này, không inject S3 trực tiếp |
+| `S3StorageService` (adapter) | [integrations/storage/s3-storage.service.ts](../src/integrations/storage/s3-storage.service.ts) | Đổi sang local/GCS chỉ sửa `storage.module.ts` |
+| `MailService` | [integrations/mail/mail.service.ts](../src/integrations/mail/mail.service.ts) | Gửi mail Handlebars, lỗi SMTP không làm hỏng request |
+| `@ApiCommonResponses` | [shared/decorators/api-common-responses.decorator.ts](../src/shared/decorators/api-common-responses.decorator.ts) | Gom Swagger response chuẩn |
+| `createMock` / `paginationParams` | [test/factories.ts](../src/test/factories.ts) | Tiện ích viết unit test |
 
 ---
 
-## 8. Checklist thêm một tính năng mới (CRUD)
+## 9. Checklist thêm một tính năng mới (CRUD)
 
-1. `prisma/schema.prisma` → thêm model → `migrate dev`.
-2. Tạo `src/modules/<feature>/` với `module/controller/service/dto`.
-3. Service: dùng `PrismaService`, `select` field cần, phân trang qua `ResponseUtil.paginate`.
-4. Controller: DTO + `@ApiCommonResponses`, `@Roles()`/`@Public()` phù hợp.
-5. Đăng ký module trong `app.module.ts`.
-6. Viết `*.service.spec.ts`.
-7. `pnpm run build && pnpm run lint && pnpm test`.
+1. `prisma/schema.prisma` → thêm model → `pnpm exec prisma migrate dev`.
+2. **`pnpm gen <ten>`** — sinh sẵn controller/service/repository/mapper/constants/module/dto
+   đúng kiến trúc (đồng thời đăng ký vào `app.module.ts` và thêm model mẫu).
+3. Sửa DTO + mapper cho khớp model thật.
+4. Repository: mọi truy vấn bảng của aggregate này nằm ở đây, không rải ra service.
+5. Controller: `@ApiCommonResponses`, `@ResponseMessage`, `@Roles()`/`@Public()` phù hợp.
+6. Viết `*.service.spec.ts` (mock repository bằng `createMock`).
+7. `pnpm typecheck && pnpm build && pnpm lint && pnpm test`.

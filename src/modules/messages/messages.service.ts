@@ -6,8 +6,10 @@ import {
 
 import { Prisma } from '@prisma/client';
 
-import { CreateMessageDto } from '@app/src/modules/messages/dto/create-message.dto';
-import { PrismaService } from '@app/src/prisma/prisma.service';
+import { PrismaService } from '@/core/database/prisma.service';
+import { UserRepository } from '@/modules/user/user.repository';
+
+import { CreateMessageDto } from './dto/create-message.dto';
 
 const MESSAGE_PARTICIPANT_SELECT = { id: true, name: true, avatar: true };
 const MESSAGE_INCLUDE = {
@@ -19,30 +21,33 @@ const DEFAULT_MESSAGES_LIMIT = 50;
 
 @Injectable()
 export class MessageService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly userRepository: UserRepository,
+  ) {}
 
-  async createMessage(senderId: string, createMessageDto: CreateMessageDto) {
-    const { content, receiverId } = createMessageDto;
-
-    const receiver = await this.prisma.user.findUnique({
-      where: { id: receiverId },
-      select: { id: true },
-    });
-    if (!receiver) {
+  async createMessage(senderId: string, dto: CreateMessageDto) {
+    // Kiểm tra người nhận qua repository của module user — module này không
+    // chạm trực tiếp vào bảng `users`.
+    if (!(await this.userRepository.exists(dto.receiverId))) {
       throw new NotFoundException('Receiver not found');
     }
 
     return this.prisma.message.create({
-      data: { content, senderId, receiverId },
+      data: {
+        content: dto.content,
+        senderId,
+        receiverId: dto.receiverId,
+      },
       include: MESSAGE_INCLUDE,
     });
   }
 
-  async getMessages(
+  getMessages(
     userId: string,
     otherUserId: string,
     take: number = DEFAULT_MESSAGES_LIMIT,
-    skip: number = 0,
+    skip = 0,
   ) {
     return this.prisma.message.findMany({
       where: {
@@ -72,19 +77,13 @@ export class MessageService {
 
     return this.prisma.message.update({
       where: { id: messageId },
-      data: {
-        isRead: true,
-        readAt: new Date(),
-      },
+      data: { isRead: true, readAt: new Date() },
     });
   }
 
-  async getUnreadMessagesCount(userId: string) {
+  getUnreadMessagesCount(userId: string): Promise<number> {
     return this.prisma.message.count({
-      where: {
-        receiverId: userId,
-        isRead: false,
-      },
+      where: { receiverId: userId, isRead: false },
     });
   }
 }

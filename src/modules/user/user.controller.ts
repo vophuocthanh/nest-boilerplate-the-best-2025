@@ -12,112 +12,109 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 
-import { User } from '@prisma/client';
+import { imageUploadOptions } from '@/config/multer.config';
+import { ADMIN_ROLE_NAME } from '@/modules/role/role.constants';
+import { ApiCommonResponses } from '@/shared/decorators/api-common-responses.decorator';
+import { AuthenticatedController } from '@/shared/decorators/authenticated-controller.decorator';
+import { CommonPagination } from '@/shared/decorators/common-pagination.decorator';
+import { CurrentUserId } from '@/shared/decorators/current-user.decorator';
+import { Pagination } from '@/shared/decorators/pagination.decorator';
+import { ResponseMessage } from '@/shared/decorators/response-message.decorator';
+import { Roles } from '@/shared/decorators/roles.decorator';
+import { Paginated } from '@/shared/pagination/paginated';
+import { PaginationParams } from '@/shared/pagination/pagination-params';
 
-import { imageUploadOptions } from '@app/src/common/config/multer-image.options';
-import { ApiCommonResponses } from '@app/src/common/decorators/api-common-responses.decorator';
-import { AuthenticatedController } from '@app/src/common/decorators/authenticated-controller.decorator';
-import { CommonPagination } from '@app/src/common/decorators/common-pagination.decorator';
-import { CommonQuery } from '@app/src/common/decorators/common-query.decorator';
-import { CurrentUserId } from '@app/src/common/decorators/current-user.decorator';
-import { Pagination } from '@app/src/common/decorators/pagination.decorator';
-import { Roles } from '@app/src/common/decorators/roles.decorator';
-import { PaginationParams } from '@app/src/common/pagination/pagination-params';
-import {
-  UpdateUserDto,
-  UpdateUserRoleDto,
-} from '@app/src/modules/user/dto/user.dto';
-import { UserService } from '@app/src/modules/user/user.service';
+import { UpdateUserDto, UpdateUserRoleDto } from './dto/update-user.dto';
+import { UserCountDto, UserDto } from './dto/user-response.dto';
+import { USER_SORT_FIELDS } from './user.constants';
+import { SafeUserRow } from './user.repository';
+import { UserService } from './user.service';
+
+/** Schema Swagger cho form upload một file ảnh. */
+const SINGLE_FILE_SCHEMA = {
+  type: 'object',
+  properties: { file: { type: 'string', format: 'binary' } },
+};
 
 @ApiTags('User')
 @AuthenticatedController('user')
 export class UserController {
-  constructor(private userService: UserService) {}
+  constructor(private readonly userService: UserService) {}
 
   @Get('me')
   @ApiCommonResponses('Lấy ra thông tin user đang đăng nhập')
-  async getCurrentUser(
-    @CurrentUserId() userId: string,
-  ): Promise<Required<Omit<User, 'password' | 'confirmPassword'>>> {
-    const user = await this.userService.getDetail(userId);
-    return user as Required<Omit<User, 'password' | 'confirmPassword'>>;
-  }
-
-  @Roles('ADMIN')
-  @Get('/count-user')
-  @ApiCommonResponses('Lấy ra số lượng user')
-  async countUser(): Promise<{ data: { total: number } }> {
-    return this.userService.getCountUser();
-  }
-
-  @CommonQuery('sort', 'Sort order (asc or desc)', ['asc', 'desc'])
-  @CommonQuery('sortBy', 'Field to sort by', ['createAt'])
-  @Get()
-  @ApiCommonResponses('Lấy ra danh sách user')
-  @CommonPagination()
-  getAll(@Pagination(['sortBy']) params: PaginationParams) {
-    return this.userService.getAll(params);
-  }
-
-  @Get(':id')
-  @ApiCommonResponses('Lấy ra thông tin chi tiết user')
-  getDetail(
-    @Param('id') id: string,
-  ): Promise<Required<Omit<User, 'password' | 'confirmPassword'>>> {
-    return this.userService.getDetail(id) as Promise<
-      Required<Omit<User, 'password' | 'confirmPassword'>>
-    >;
-  }
-
-  @Roles('ADMIN')
-  @Put(':id/role')
-  @ApiCommonResponses('Cập nhật role cho user')
-  async updateUserRole(
-    @Param('id') id: string,
-    @Body() data: UpdateUserRoleDto,
-    @CurrentUserId() userId: string,
-  ) {
-    return this.userService.updateUserRole(id, data.roleId, userId);
+  getCurrentUser(@CurrentUserId() userId: string): Promise<UserDto> {
+    return this.userService.getDetail(userId);
   }
 
   @Put('me')
   @ApiCommonResponses('Cập nhật thông tin user đang đăng nhập')
-  async updateMe(@CurrentUserId() userId: string, @Body() data: UpdateUserDto) {
-    return this.userService.updateMeUser(data, userId);
+  @ResponseMessage('User updated successfully')
+  updateMe(
+    @CurrentUserId() userId: string,
+    @Body() data: UpdateUserDto,
+  ): Promise<UserDto> {
+    return this.userService.updateMe(userId, data);
   }
 
   @Post('upload-avatar')
   @ApiCommonResponses('Upload user avatar')
   @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        file: {
-          type: 'string',
-          format: 'binary',
-        },
-      },
-    },
-  })
+  @ApiBody({ schema: SINGLE_FILE_SCHEMA })
+  @ResponseMessage('Avatar updated successfully')
   @UseInterceptors(FileInterceptor('file', imageUploadOptions))
-  async uploadAvatarS3(
+  uploadAvatar(
     @CurrentUserId() userId: string,
     @UploadedFile() file: Express.Multer.File,
-  ) {
+  ): Promise<UserDto> {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
-    return await this.userService.updateAvatarS3(userId, file);
+    return this.userService.updateAvatar(userId, file);
   }
 
-  @Roles('ADMIN')
+  @Roles(ADMIN_ROLE_NAME)
+  @Get('count-user')
+  @ApiCommonResponses('Lấy ra số lượng user')
+  getCountUser(): Promise<UserCountDto> {
+    return this.userService.getCountUser();
+  }
+
+  @Get()
+  @ApiCommonResponses('Lấy ra danh sách user')
+  @CommonPagination(USER_SORT_FIELDS)
+  getAll(
+    @Pagination() params: PaginationParams,
+  ): Promise<Paginated<SafeUserRow>> {
+    return this.userService.getAll(params);
+  }
+
+  @Get(':id')
+  @ApiCommonResponses('Lấy ra thông tin chi tiết user')
+  getDetail(@Param('id') id: string): Promise<UserDto> {
+    return this.userService.getDetail(id);
+  }
+
+  @Roles(ADMIN_ROLE_NAME)
+  @Put(':id/role')
+  @ApiCommonResponses('Cập nhật role cho user')
+  @ResponseMessage('User role updated successfully')
+  updateUserRole(
+    @Param('id') id: string,
+    @Body() data: UpdateUserRoleDto,
+    @CurrentUserId() currentUserId: string,
+  ): Promise<UserDto> {
+    return this.userService.updateUserRole(id, data.roleId, currentUserId);
+  }
+
+  @Roles(ADMIN_ROLE_NAME)
   @Delete(':id')
   @ApiCommonResponses('Xóa user')
-  async deleteUser(
+  @ResponseMessage('Xóa user thành công')
+  deleteUser(
     @Param('id') id: string,
     @CurrentUserId() currentUserId: string,
-  ): Promise<{ message: string }> {
+  ): Promise<void> {
     return this.userService.deleteUser(id, currentUserId);
   }
 }

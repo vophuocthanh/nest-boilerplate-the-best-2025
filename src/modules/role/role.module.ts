@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 
-import { RoleController } from '@app/src/modules/role/role.controller';
-import { RoleService } from '@app/src/modules/role/role.service';
+import { RoleController } from './role.controller';
+import { RoleRepository } from './role.repository';
+import { RoleService } from './role.service';
 
 @Module({
   controllers: [RoleController],
-  providers: [RoleService, JwtService],
+  providers: [RoleService, RoleRepository],
+  // AuthModule cần đọc role mặc định khi tạo user -> đi qua repository của Role,
+  // thay vì tự query bảng `roles`.
+  exports: [RoleRepository],
 })
 export class RoleModule {}

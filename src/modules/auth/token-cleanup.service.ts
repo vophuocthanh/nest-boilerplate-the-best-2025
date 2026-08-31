@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
-import { PrismaService } from '@app/src/prisma/prisma.service';
+import { RefreshTokenRepository } from './refresh-token.repository';
 
 /**
  * Dọn refresh token đã hết hạn hoặc đã bị thu hồi để bảng không phình vô hạn.
@@ -11,15 +11,13 @@ import { PrismaService } from '@app/src/prisma/prisma.service';
 export class TokenCleanupService {
   private readonly logger = new Logger(TokenCleanupService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly refreshTokenRepository: RefreshTokenRepository,
+  ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async purgeStaleRefreshTokens(): Promise<void> {
-    const { count } = await this.prisma.refreshToken.deleteMany({
-      where: {
-        OR: [{ expiresAt: { lt: new Date() } }, { revoked: true }],
-      },
-    });
+    const { count } = await this.refreshTokenRepository.purgeStale();
     if (count > 0) {
       this.logger.log(`Purged ${count} stale refresh token(s)`);
     }

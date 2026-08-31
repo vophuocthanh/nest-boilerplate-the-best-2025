@@ -1,6 +1,4 @@
-import { User } from '@prisma/client';
-
-/** Payload được ký trong JWT access/refresh token */
+/** Payload được ký trong JWT access/refresh token. */
 export interface JwtPayload {
   id: string;
   email: string;
@@ -8,24 +6,28 @@ export interface JwtPayload {
   role?: string;
 }
 
-/** Cặp token trả về khi đăng nhập */
+/** Cặp token trả về khi đăng nhập. */
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
 }
 
-/** Thông tin user an toàn để trả về client (không có password) */
+/** Thông tin user an toàn kèm trong kết quả đăng nhập (không có password). */
 export interface SafeUser {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: string | null;
 }
 
-/** Kết quả đăng nhập: token + user */
+/** Kết quả đăng nhập: token + user. */
 export interface AuthResult extends AuthTokens {
   user: SafeUser;
 }
 
-/** User kèm quan hệ role đã include */
-export type UserWithRole = User & { role: { name: string } };
+/** Hồ sơ Google trả về sau khi xác thực OAuth. */
+export interface GoogleProfile {
+  email: string;
+  name: string;
+  googleId: string;
+}

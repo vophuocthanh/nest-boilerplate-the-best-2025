@@ -1,74 +1,56 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
-import { User } from '@prisma/client';
-
-import { compare, hash } from 'bcrypt';
 import { randomBytes } from 'crypto';
 
-import { MailService } from '@app/src/modules/mail/mail.service';
-import { PrismaService } from '@app/src/prisma/prisma.service';
+import { MailService } from '@/integrations/mail/mail.service';
+import { UserRepository } from '@/modules/user/user.repository';
 
-import { hashToken, resolveBcryptRounds } from '../auth.helpers';
+import { hashToken } from '../auth.crypto';
 import { ForgotPasswordDto } from '../dto/auth.dto';
+import { PasswordHasher } from '../password-hasher.service';
+import { RefreshTokenRepository } from '../refresh-token.repository';
+
+const RESET_TOKEN_TTL_MINUTES = 60;
+const RESET_TOKEN_BYTES = 32;
 
 /**
- * Password management: forgot password (send a reset token), reset password
- * (one-time token), and change password while authenticated.
+ * Quản lý mật khẩu: quên mật khẩu (gửi reset token), đặt lại mật khẩu bằng
+ * token dùng một lần, và đổi mật khẩu khi đã đăng nhập.
  */
 @Injectable()
 export class PasswordService {
-  private static readonly RESET_TOKEN_TTL_MINUTES = 60;
-
-  private readonly bcryptRounds: number;
-
   constructor(
-    private readonly prismaService: PrismaService,
+    private readonly userRepository: UserRepository,
+    private readonly refreshTokenRepository: RefreshTokenRepository,
     private readonly mailService: MailService,
-    private readonly configService: ConfigService,
-  ) {
-    this.bcryptRounds = resolveBcryptRounds(
-      this.configService.get<number>('security.bcryptSaltRounds'),
-    );
-  }
+    private readonly passwordHasher: PasswordHasher,
+  ) {}
 
-  async forgotPassword(data: ForgotPasswordDto): Promise<{ message: string }> {
-    const genericMessage = {
-      message: 'If the email exists, reset instructions have been sent.',
-    };
-
-    const user = await this.prismaService.user.findUnique({
-      where: { email: data.email },
-    });
-    // Always return a generic message so we don't reveal which emails are registered.
+  /**
+   * Luôn kết thúc im lặng dù email có tồn tại hay không — response giống hệt
+   * nhau trong mọi trường hợp (chống account enumeration).
+   */
+  async forgotPassword({ email }: ForgotPasswordDto): Promise<void> {
+    const user = await this.userRepository.findByEmail(email);
     if (!user) {
-      return genericMessage;
+      return;
     }
 
-    // Random reset token, single-use, expires after RESET_TOKEN_TTL_MINUTES
-    const resetToken = randomBytes(32).toString('hex');
+    const resetToken = randomBytes(RESET_TOKEN_BYTES).toString('hex');
     const expiresAt = new Date();
-    expiresAt.setMinutes(
-      expiresAt.getMinutes() + PasswordService.RESET_TOKEN_TTL_MINUTES,
+    expiresAt.setMinutes(expiresAt.getMinutes() + RESET_TOKEN_TTL_MINUTES);
+
+    await this.userRepository.setResetToken(
+      user.id,
+      hashToken(resetToken),
+      expiresAt,
     );
 
-    await this.prismaService.user.update({
-      where: { id: user.id },
-      data: {
-        resetToken: hashToken(resetToken),
-        resetTokenExpiresAt: expiresAt,
-      },
-    });
-
-    // The email carries the raw token; the FE combines it with URL_RESET_PASSWORD to build the reset link
-    await this.sendResetPasswordEmail(data.email, resetToken);
-    return genericMessage;
-  }
-
-  private async sendResetPasswordEmail(
-    email: string,
-    resetToken: string,
-  ): Promise<void> {
+    // Email mang token thô; FE ghép với URL_RESET_PASSWORD để tạo link đặt lại.
     await this.mailService.sendMail({
       to: email,
       subject: 'Reset mật khẩu',
@@ -81,163 +63,98 @@ export class PasswordService {
     token: string,
     newPassword: string,
     confirmPassword: string,
-  ): Promise<{ message: string }> {
-    if (newPassword !== confirmPassword) {
-      throw new HttpException(
-        {
-          message: {
-            confirmPassword: 'Password and confirm password do not match',
-          },
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  ): Promise<void> {
+    this.assertPasswordsMatch(newPassword, confirmPassword);
 
-    const user = await this.prismaService.user.findFirst({
-      where: { resetToken: hashToken(token) },
-    });
+    const user = await this.userRepository.findByResetTokenHash(
+      hashToken(token),
+    );
     if (
       !user ||
       !user.resetTokenExpiresAt ||
       user.resetTokenExpiresAt < new Date()
     ) {
-      throw new HttpException(
-        { message: { token: 'Reset token is invalid or has expired' } },
-        HttpStatus.BAD_REQUEST,
-      );
+      throw new BadRequestException({
+        message: { token: 'Reset token is invalid or has expired' },
+      });
     }
 
     if (user.password) {
-      await this.validateNewPassword(newPassword, user.password);
+      await this.assertPasswordIsNew(newPassword, user.password);
     }
 
-    const hashedPassword = await hash(newPassword, this.bcryptRounds);
-    await this.prismaService.user.update({
-      where: { id: user.id },
-      // Clear the token after use (one-time)
-      data: {
-        password: hashedPassword,
-        resetToken: null,
-        resetTokenExpiresAt: null,
-      },
-    });
-
-    // Revoke all existing refresh tokens -> force re-login on every device
-    await this.prismaService.refreshToken.updateMany({
-      where: { userId: user.id },
-      data: { revoked: true },
-    });
-
-    return { message: 'Password reset successfully' };
-  }
-
-  private async getUserPassword(
-    userId: string,
-  ): Promise<{ password: string | null }> {
-    const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
-      select: { password: true },
-    });
-    if (!user) {
-      throw new HttpException(
-        { message: { user: 'User not found' } },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-    return user;
-  }
-
-  private async validateNewPassword(
-    newPassword: string,
-    currentPassword: string,
-  ): Promise<void> {
-    const isSamePassword = await compare(newPassword, currentPassword);
-    if (isSamePassword) {
-      throw new HttpException(
-        {
-          message: {
-            password: 'New password cannot be the same as the old password',
-          },
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
-
-  private async updateUserPassword(
-    userId: string,
-    newPassword: string,
-  ): Promise<void> {
-    const hashedPassword = await hash(newPassword, this.bcryptRounds);
-    await this.prismaService.user.update({
-      where: { id: userId },
-      data: { password: hashedPassword },
-    });
+    await this.userRepository.updatePasswordAndClearResetToken(
+      user.id,
+      await this.passwordHasher.hash(newPassword),
+    );
+    // Thu hồi mọi refresh token -> buộc đăng nhập lại trên mọi thiết bị.
+    await this.refreshTokenRepository.revokeAllForUser(user.id);
   }
 
   async changePassword(
-    user: User,
-    currentPassword: string,
-    newPassword: string,
-    confirmPassword: string,
-  ): Promise<{ message: string }> {
-    const userRecord = await this.getUserPassword(user.id);
-    if (!userRecord.password) {
-      throw new HttpException(
-        { message: 'Google account cannot change password this way' },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-    await this.validateCurrentPassword(currentPassword, userRecord.password);
-    await this.validatePasswordChange(
-      currentPassword,
-      newPassword,
-      confirmPassword,
-    );
-    await this.updateUserPassword(user.id, newPassword);
-    return { message: 'Password changed successfully' };
-  }
-
-  private async validateCurrentPassword(
-    currentPassword: string,
-    storedPassword: string,
-  ): Promise<void> {
-    const isCurrentPasswordCorrect = await compare(
-      currentPassword,
-      storedPassword,
-    );
-    if (!isCurrentPasswordCorrect) {
-      throw new HttpException(
-        { message: { password: 'Current password is incorrect' } },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
-
-  private async validatePasswordChange(
+    userId: string,
     currentPassword: string,
     newPassword: string,
     confirmPassword: string,
   ): Promise<void> {
-    if (currentPassword === newPassword) {
-      throw new HttpException(
-        {
-          message: {
-            password: 'New password cannot be the same as the current password',
-          },
-        },
-        HttpStatus.BAD_REQUEST,
-      );
+    const record = await this.userRepository.findPasswordById(userId);
+    if (!record) {
+      throw new NotFoundException({ message: { user: 'User not found' } });
     }
+    if (!record.password) {
+      throw new BadRequestException({
+        message: 'Google account cannot change password this way',
+      });
+    }
+
+    const isCurrentCorrect = await this.passwordHasher.compare(
+      currentPassword,
+      record.password,
+    );
+    if (!isCurrentCorrect) {
+      throw new BadRequestException({
+        message: { password: 'Current password is incorrect' },
+      });
+    }
+
+    this.assertPasswordsMatch(newPassword, confirmPassword);
+    await this.assertPasswordIsNew(newPassword, record.password);
+
+    await this.userRepository.updatePassword(
+      userId,
+      await this.passwordHasher.hash(newPassword),
+    );
+  }
+
+  // --- Nội bộ ---------------------------------------------------------------
+
+  private assertPasswordsMatch(
+    newPassword: string,
+    confirmPassword: string,
+  ): void {
     if (newPassword !== confirmPassword) {
-      throw new HttpException(
-        {
-          message: {
-            confirmPassword: 'New password and confirm password do not match',
-          },
+      throw new BadRequestException({
+        message: {
+          confirmPassword: 'Password and confirm password do not match',
         },
-        HttpStatus.BAD_REQUEST,
-      );
+      });
+    }
+  }
+
+  private async assertPasswordIsNew(
+    newPassword: string,
+    currentPasswordHash: string,
+  ): Promise<void> {
+    const isSame = await this.passwordHasher.compare(
+      newPassword,
+      currentPasswordHash,
+    );
+    if (isSame) {
+      throw new BadRequestException({
+        message: {
+          password: 'New password cannot be the same as the old password',
+        },
+      });
     }
   }
 }

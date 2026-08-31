@@ -1,291 +1,237 @@
-import { HttpException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
 
-import * as bcrypt from 'bcrypt';
-import { createHash } from 'crypto';
-
-import { MailService } from '@app/src/modules/mail/mail.service';
-import { PrismaService } from '@app/src/prisma/prisma.service';
+import { RoleRepository } from '@/modules/role/role.repository';
+import { UserRepository } from '@/modules/user/user.repository';
+import { createMock } from '@/test/factories';
 
 import { AuthService } from './auth.service';
-import { PasswordService } from './services/password.service';
-import { RegistrationService } from './services/registration.service';
+import { PasswordHasher } from './password-hasher.service';
 import { TokenService } from './services/token.service';
 
-jest.mock('bcrypt');
+const CREDENTIALS = { email: 'a@b.com', password: 'plain' };
 
-const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
-
-/** Kiểm tra promise reject với HttpException có payload chứa chuỗi mong đợi */
-const expectHttpError = async (promise: Promise<unknown>, substr: string) => {
-  await expect(promise).rejects.toThrow(HttpException);
-  await promise.catch((e: HttpException) => {
-    expect(JSON.stringify(e.getResponse())).toContain(substr);
-  });
-};
+const verifiedUser = (overrides: Record<string, unknown> = {}) => ({
+  id: '1',
+  name: 'A',
+  email: CREDENTIALS.email,
+  password: 'hash',
+  isVerified: true,
+  failedLoginAttempts: 0,
+  lockedUntil: null,
+  role: { name: 'USER' },
+  ...overrides,
+});
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prisma: {
-    user: Record<string, jest.Mock>;
-    role: Record<string, jest.Mock>;
-    refreshToken: Record<string, jest.Mock>;
-  };
-  let jwt: Record<string, jest.Mock>;
-  let mail: Record<string, jest.Mock>;
+  let userRepository: jest.Mocked<UserRepository>;
+  let roleRepository: jest.Mocked<RoleRepository>;
+  let tokenService: jest.Mocked<TokenService>;
+  let passwordHasher: jest.Mocked<PasswordHasher>;
 
   beforeEach(async () => {
-    prisma = {
-      user: {
-        findUnique: jest.fn(),
-        findFirst: jest.fn(),
-        create: jest.fn(),
-        update: jest.fn(),
-      },
-      role: { findUnique: jest.fn() },
-      refreshToken: {
-        create: jest.fn(),
-        findUnique: jest.fn(),
-        update: jest.fn(),
-        updateMany: jest.fn(),
-      },
-    };
-    jwt = {
-      signAsync: jest.fn().mockResolvedValue('signed.jwt.token'),
-      sign: jest.fn().mockReturnValue('signed.jwt.token'),
-      verify: jest.fn(),
-    };
-    mail = { sendMail: jest.fn().mockResolvedValue(undefined) };
+    userRepository = createMock<UserRepository>({
+      findByEmailWithRole: jest.fn(),
+      findByGoogleIdWithRole: jest.fn(),
+      linkGoogleAccount: jest.fn(),
+      createFromGoogle: jest.fn(),
+      recordFailedLogin: jest.fn(),
+      lockAccount: jest.fn(),
+      clearLoginFailures: jest.fn(),
+    });
+    roleRepository = createMock<RoleRepository>({ findByName: jest.fn() });
+    tokenService = createMock<TokenService>({
+      generateTokens: jest
+        .fn()
+        .mockResolvedValue({ accessToken: 'at', refreshToken: 'rt' }),
+    });
+    passwordHasher = createMock<PasswordHasher>({ compare: jest.fn() });
 
-    const configValues: Record<string, string> = {
-      'jwt.accessSecret': 'access-secret',
-      'jwt.refreshSecret': 'refresh-secret',
-      'jwt.accessExpiresIn': '1d',
-      'jwt.refreshExpiresIn': '7d',
+    const configValues: Record<string, number> = {
+      'security.maxFailedLoginAttempts': 3,
+      'security.accountLockMinutes': 15,
     };
-    const config = { get: jest.fn((key: string) => configValues[key]) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
-        // Các service con dùng chung mock Prisma/Jwt/Mail/Config
-        TokenService,
-        RegistrationService,
-        PasswordService,
-        { provide: PrismaService, useValue: prisma },
-        { provide: JwtService, useValue: jwt },
-        { provide: MailService, useValue: mail },
-        { provide: ConfigService, useValue: config },
+        {
+          provide: ConfigService,
+          useValue: { get: jest.fn((key: string) => configValues[key]) },
+        },
+        { provide: UserRepository, useValue: userRepository },
+        { provide: RoleRepository, useValue: roleRepository },
+        { provide: TokenService, useValue: tokenService },
+        { provide: PasswordHasher, useValue: passwordHasher },
       ],
     }).compile();
 
-    service = module.get<AuthService>(AuthService);
+    service = module.get(AuthService);
   });
 
   afterEach(() => jest.clearAllMocks());
 
   describe('login', () => {
-    const credentials = { email: 'a@b.com', password: 'plain' };
-
-    it('ném lỗi khi không tìm thấy user', async () => {
-      prisma.user.findUnique.mockResolvedValue(null);
-      await expect(service.login(credentials)).rejects.toThrow(HttpException);
-    });
-
-    it('ném lỗi khi account chưa verify', async () => {
-      prisma.user.findUnique.mockResolvedValue({
-        id: '1',
-        isVerified: false,
-        role: { name: 'USER' },
-        password: 'hash',
-      });
-      // Mật khẩu đúng -> mới tới được bước kiểm tra verify
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      await expectHttpError(
-        service.login(credentials),
-        'Account is not verified',
-      );
-    });
-
-    it('ném lỗi khi sai mật khẩu', async () => {
-      prisma.user.findUnique.mockResolvedValue({
-        id: '1',
-        isVerified: true,
-        role: { name: 'USER' },
-        password: 'hash',
-      });
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
-      await expectHttpError(
-        service.login(credentials),
-        'Email hoặc mật khẩu không đúng',
-      );
-    });
-
-    it('trả token + user khi đăng nhập thành công, đồng thời lưu refresh token', async () => {
-      prisma.user.findUnique.mockResolvedValue({
-        id: '1',
-        name: 'A',
-        email: 'a@b.com',
-        isVerified: true,
-        role: { name: 'USER' },
-        password: 'hash',
-      });
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-
-      const result = await service.login(credentials);
-
-      expect(result.accessToken).toBeDefined();
-      expect(result.refreshToken).toBeDefined();
-      expect(result.user).toEqual({
-        id: '1',
-        name: 'A',
-        email: 'a@b.com',
-        role: 'USER',
-      });
-      // Refresh token được persist (rotation/revoke)
-      expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('refreshToken (rotation)', () => {
-    const dto = { refreshToken: 'raw-refresh' };
-
-    it('ném lỗi khi chữ ký token sai', async () => {
-      jwt.verify.mockImplementation(() => {
-        throw new Error('invalid');
-      });
-      await expect(service.refreshToken(dto)).rejects.toThrow(
+    it('ném lỗi chung khi không tìm thấy user', async () => {
+      userRepository.findByEmailWithRole.mockResolvedValue(null);
+      await expect(service.login(CREDENTIALS)).rejects.toThrow(
         UnauthorizedException,
       );
     });
 
-    it('phát hiện reuse: token đã thu hồi nhưng bị dùng lại -> thu hồi toàn bộ session', async () => {
-      jwt.verify.mockReturnValue({ id: '1' });
-      prisma.refreshToken.findUnique.mockResolvedValue({
-        id: 'rt1',
-        userId: '1',
-        revoked: true,
-        expiresAt: new Date(Date.now() + 100000),
-      });
-      await expect(service.refreshToken(dto)).rejects.toThrow('reuse detected');
-      // Toàn bộ refresh token của user bị thu hồi
-      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
-        where: { userId: '1' },
-        data: { revoked: true },
-      });
+    it('ném lỗi chung khi sai mật khẩu và ghi nhận lần đăng nhập sai', async () => {
+      userRepository.findByEmailWithRole.mockResolvedValue(
+        verifiedUser({ failedLoginAttempts: 1 }) as never,
+      );
+      passwordHasher.compare.mockResolvedValue(false);
+
+      await expect(service.login(CREDENTIALS)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(userRepository.recordFailedLogin).toHaveBeenCalledWith('1', 2);
+      expect(userRepository.lockAccount).not.toHaveBeenCalled();
     });
 
-    it('ném lỗi khi token không tồn tại hoặc đã hết hạn', async () => {
-      jwt.verify.mockReturnValue({ id: '1' });
-      prisma.refreshToken.findUnique.mockResolvedValue(null);
-      await expect(service.refreshToken(dto)).rejects.toThrow(
-        'invalid or has been revoked',
+    it('khoá tài khoản khi vượt ngưỡng đăng nhập sai', async () => {
+      userRepository.findByEmailWithRole.mockResolvedValue(
+        verifiedUser({ failedLoginAttempts: 2 }) as never,
+      );
+      passwordHasher.compare.mockResolvedValue(false);
+
+      await expect(service.login(CREDENTIALS)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(userRepository.lockAccount).toHaveBeenCalledWith(
+        '1',
+        expect.any(Date),
+      );
+      expect(userRepository.recordFailedLogin).not.toHaveBeenCalled();
+    });
+
+    it('từ chối khi tài khoản đang bị khoá, kể cả mật khẩu đúng', async () => {
+      userRepository.findByEmailWithRole.mockResolvedValue(
+        verifiedUser({ lockedUntil: new Date(Date.now() + 60_000) }) as never,
+      );
+      passwordHasher.compare.mockResolvedValue(true);
+
+      await expect(service.login(CREDENTIALS)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(passwordHasher.compare).not.toHaveBeenCalled();
+    });
+
+    it('ném lỗi khi account chưa verify', async () => {
+      userRepository.findByEmailWithRole.mockResolvedValue(
+        verifiedUser({ isVerified: false }) as never,
+      );
+      passwordHasher.compare.mockResolvedValue(true);
+
+      await expect(service.login(CREDENTIALS)).rejects.toThrow(
+        UnauthorizedException,
       );
     });
 
-    it('thu hồi token cũ và cấp cặp token mới', async () => {
-      jwt.verify.mockReturnValue({ id: '1' });
-      prisma.refreshToken.findUnique.mockResolvedValue({
-        id: 'rt1',
-        revoked: false,
-        expiresAt: new Date(Date.now() + 100000),
-      });
-      prisma.user.findUnique.mockResolvedValue({
-        id: '1',
-        name: 'A',
-        email: 'a@b.com',
-        role: { name: 'USER' },
-      });
+    it('ném 403 khi user chưa được gán role', async () => {
+      userRepository.findByEmailWithRole.mockResolvedValue(
+        verifiedUser({ role: null }) as never,
+      );
+      passwordHasher.compare.mockResolvedValue(true);
 
-      const result = await service.refreshToken(dto);
+      await expect(service.login(CREDENTIALS)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
 
-      // Token cũ bị revoke
-      expect(prisma.refreshToken.update).toHaveBeenCalledWith({
-        where: { id: 'rt1' },
-        data: { revoked: true },
+    it('trả token + user an toàn khi đăng nhập thành công', async () => {
+      userRepository.findByEmailWithRole.mockResolvedValue(
+        verifiedUser({ failedLoginAttempts: 2 }) as never,
+      );
+      passwordHasher.compare.mockResolvedValue(true);
+
+      const result = await service.login(CREDENTIALS);
+
+      expect(result).toEqual({
+        accessToken: 'at',
+        refreshToken: 'rt',
+        user: { id: '1', name: 'A', email: CREDENTIALS.email, role: 'USER' },
       });
-      // Cấp token mới + persist
-      expect(result.accessToken).toBeDefined();
-      expect(result.refreshToken).toBeDefined();
-      expect(prisma.refreshToken.create).toHaveBeenCalledTimes(1);
+      // Bộ đếm đăng nhập sai được reset sau khi đăng nhập thành công.
+      expect(userRepository.clearLoginFailures).toHaveBeenCalledWith('1');
+    });
+
+    it('không trả bất kỳ field nhạy cảm nào trong `user`', async () => {
+      userRepository.findByEmailWithRole.mockResolvedValue(
+        verifiedUser({ resetToken: 'secret', googleId: 'g-1' }) as never,
+      );
+      passwordHasher.compare.mockResolvedValue(true);
+
+      const { user } = await service.login(CREDENTIALS);
+
+      expect(Object.keys(user).sort()).toEqual(['email', 'id', 'name', 'role']);
     });
   });
 
-  describe('resetPassword', () => {
-    it('ném lỗi khi password và confirm không khớp', async () => {
-      await expectHttpError(
-        service.resetPassword('tok', 'NewPass1', 'Different1'),
-        'do not match',
+  describe('googleLogin', () => {
+    const profile = { email: 'a@b.com', name: 'A', googleId: 'g-1' };
+
+    it('dùng lại tài khoản đã liên kết googleId', async () => {
+      userRepository.findByGoogleIdWithRole.mockResolvedValue(
+        verifiedUser() as never,
       );
+
+      const result = await service.googleLogin(profile);
+
+      expect(result.user.id).toBe('1');
+      expect(userRepository.createFromGoogle).not.toHaveBeenCalled();
     });
 
-    it('ném lỗi khi token không tồn tại/hết hạn', async () => {
-      prisma.user.findFirst.mockResolvedValue(null);
-      await expectHttpError(
-        service.resetPassword('tok', 'NewPass1', 'NewPass1'),
-        'invalid or has expired',
+    it('từ chối liên kết Google vào tài khoản local CHƯA verify', async () => {
+      userRepository.findByGoogleIdWithRole.mockResolvedValue(null);
+      userRepository.findByEmailWithRole.mockResolvedValue(
+        verifiedUser({ isVerified: false }) as never,
       );
+
+      await expect(service.googleLogin(profile)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(userRepository.linkGoogleAccount).not.toHaveBeenCalled();
     });
 
-    it('đặt lại mật khẩu, xoá token và thu hồi refresh token', async () => {
-      prisma.user.findFirst.mockResolvedValue({
-        id: '1',
-        password: 'oldhash',
-        resetToken: sha256('tok'),
-        resetTokenExpiresAt: new Date(Date.now() + 100000),
+    it('liên kết Google vào tài khoản local đã verify', async () => {
+      userRepository.findByGoogleIdWithRole.mockResolvedValue(null);
+      userRepository.findByEmailWithRole.mockResolvedValue(
+        verifiedUser() as never,
+      );
+      userRepository.linkGoogleAccount.mockResolvedValue(
+        verifiedUser({ googleId: 'g-1' }) as never,
+      );
+
+      await service.googleLogin(profile);
+
+      expect(userRepository.linkGoogleAccount).toHaveBeenCalledWith('1', 'g-1');
+    });
+
+    it('tạo user mới với role mặc định khi chưa tồn tại', async () => {
+      userRepository.findByGoogleIdWithRole.mockResolvedValue(null);
+      userRepository.findByEmailWithRole.mockResolvedValue(null);
+      roleRepository.findByName.mockResolvedValue({
+        id: 'role-1',
+        name: 'USER',
       });
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false); // khác mật khẩu cũ
-      (bcrypt.hash as jest.Mock).mockResolvedValue('newhash');
-
-      const result = await service.resetPassword('tok', 'NewPass1', 'NewPass1');
-
-      expect(result.message).toContain('successfully');
-      // Token reset bị xoá sau khi dùng
-      expect(prisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            resetToken: null,
-            resetTokenExpiresAt: null,
-          }),
-        }),
+      userRepository.createFromGoogle.mockResolvedValue(
+        verifiedUser() as never,
       );
-      // Thu hồi mọi refresh token
-      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
-        where: { userId: '1' },
-        data: { revoked: true },
+
+      await service.googleLogin(profile);
+
+      expect(userRepository.createFromGoogle).toHaveBeenCalledWith({
+        email: profile.email,
+        name: profile.name,
+        googleId: profile.googleId,
+        roleId: 'role-1',
       });
-    });
-  });
-
-  describe('logout', () => {
-    it('thu hồi refresh token theo hash', async () => {
-      await service.logout('raw-refresh');
-      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
-        where: { tokenHash: sha256('raw-refresh') },
-        data: { revoked: true },
-      });
-    });
-  });
-
-  describe('forgotPassword', () => {
-    it('tạo reset token, lưu hash + gửi mail', async () => {
-      prisma.user.findUnique.mockResolvedValue({ id: '1', email: 'a@b.com' });
-
-      const result = await service.forgotPassword({ email: 'a@b.com' });
-
-      expect(prisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: '1' },
-          data: expect.objectContaining({
-            resetToken: expect.any(String),
-            resetTokenExpiresAt: expect.any(Date),
-          }),
-        }),
-      );
-      expect(mail.sendMail).toHaveBeenCalledTimes(1);
-      expect(result.message).toContain('email');
     });
   });
 });

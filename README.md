@@ -88,7 +88,7 @@ pnpm install
 cp .env.example .env
 ```
 
-Fill in at least the 3 **required** variables (the app fails fast if any is missing — validated by Joi in [`src/configs/env.validation.ts`](src/configs/env.validation.ts)):
+Fill in at least the 3 **required** variables (the app fails fast if any is missing — validated by Joi in [`src/config/env.validation.ts`](src/config/env.validation.ts)):
 
 ```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/nestjs_boilerplate?schema=public
@@ -191,19 +191,22 @@ docker run --rm -p 3001:3001 --env-file .env nest-boilerplate
 
 ## 🧩 Generate a CRUD module
 
-Instead of `nest g resource`, use the project generator ([`scripts/generate-module.js`](scripts/generate-module.js)) to scaffold a complete CRUD module under `src/modules/<name>` following the project conventions (Swagger, guards, pagination, `ResponseUtil`, Prisma):
+Instead of `nest g resource`, use the project generator ([`scripts/generate-module.js`](scripts/generate-module.js)) to scaffold a complete CRUD module under `src/modules/<name>` following the project's layered conventions (Swagger, global guards, pagination, repository + mapper, Prisma):
 
 ```bash
 pnpm gen product
 pnpm gen product-category
 ```
 
-Each run creates:
+Each run creates all five roles of a feature module:
 
-- `src/modules/<name>/<name>.controller.ts` – CRUD: create / getAll (pagination) / getDetail / update / remove
-- `src/modules/<name>/<name>.service.ts` – uses `PrismaService` + `ResponseUtil`
-- `src/modules/<name>/<name>.module.ts`
-- `src/modules/<name>/dto/` – `create`, `update` (PartialType), and `filter` DTOs with `name`, `description`, `status` fields
+- `<name>.controller.ts` – routes + DTOs + Swagger, no business logic
+- `<name>.service.ts` – business logic, returns plain DTOs (the envelope is added by `TransformInterceptor`)
+- `<name>.repository.ts` – the single place that touches this aggregate's table
+- `<name>.mapper.ts` – entity → DTO, **whitelist** of exposed fields
+- `<name>.constants.ts` – `sortBy` whitelist
+- `<name>.module.ts` – declaration + `exports`
+- `dto/` – `create`, `update` (PartialType) and `<name>-response` DTOs
 
 It also **registers the module** in `app.module.ts` and **adds a sample Prisma model** to `schema.prisma`.
 
@@ -248,15 +251,22 @@ pnpm exec prisma generate
 ## 📡 API & Real-time
 
 - All HTTP routes are served under the global prefix **`/api`**. Browse and try them interactively in the **Swagger UI at `http://localhost:3001/api`** (click *Authorize* to attach a Bearer token).
-- Responses are normalized through `ResponseUtil`:
+- Responses are normalized by `TransformInterceptor` — services return plain data and never wrap it themselves:
 
   ```jsonc
   // Success
-  { "data": <T>, "message": "Success", "status": 200 }
+  { "statusCode": 200, "message": "Success", "data": <T> }
 
-  // Paginated
-  { "data": [...], "total": 42, "currentPage": 1, "itemsPerPage": 10, "totalPages": 5, "message": "Success", "status": 200 }
+  // Paginated (service returns `Paginated<T>` = { items, meta })
+  { "statusCode": 200, "message": "Success", "data": [ /* items */ ],
+    "meta": { "total": 42, "page": 1, "pageSize": 10, "totalPages": 5 } }
+
+  // Error (AllExceptionsFilter, Prisma error codes included)
+  { "statusCode": 400, "message": { "email": "Email không hợp lệ" },
+    "error": "Bad Request", "timestamp": "…", "path": "/api/…", "requestId": "…" }
   ```
+
+  Use `@ResponseMessage('…')` on a route for a custom message, `@SkipTransform()` to opt out.
 
 - Global rate limit: **100 requests / 60s** per IP (some auth endpoints are stricter at 5/60s).
 
@@ -333,26 +343,39 @@ Copy from [`.env.example`](.env.example). **Required** (the app stops immediatel
 
 ```
 src/
-├── main.ts                 # Bootstrap: /api prefix, Helmet, CORS, Swagger, ValidationPipe, shutdown hooks
-├── app.module.ts           # Root module (registers modules + the global ThrottlerGuard)
-├── app.controller.ts       # GET / (hello)
-├── modules/                # Feature modules
-│   ├── auth/               # Registration/login, JWT, refresh tokens, Google OAuth
+├── main.ts                 # Bootstrap: /api prefix, versioning, Helmet, CORS, body parser, Swagger
+├── app.module.ts           # Root module: loads config + lists feature modules
+├── app.controller.ts       # GET / (service info)
+│
+├── config/                 # "does this value come from env?"
+│   ├── configuration.ts · env.validation.ts · cors.config.ts · multer.config.ts
+│   └── swagger/            # swagger.config.ts · swagger-theme.ts
+│
+├── core/                   # "does this run once for EVERY request?"
+│   ├── core.module.ts      # global filter / interceptor / guards + middleware wiring
+│   ├── filters/ interceptors/ guards/ pipes/ middlewares/
+│   ├── jwt/                # JwtCoreModule — JWT signing config, declared once
+│   └── database/           # PrismaService + PrismaModule (@Global)
+│
+├── shared/                 # "reusable, registers nothing on its own?"
+│   ├── decorators/         # @Public @Roles @CurrentUser @Pagination @ResponseMessage …
+│   ├── pagination/         # PaginationParams, Paginated<T>, paginate()
+│   └── constants/ types/
+│
+├── integrations/           # "does this call out of the process?"
+│   ├── storage/            # StorageService (port) + S3StorageService (adapter)
+│   └── mail/               # SMTP + Handlebars templates
+│
+├── modules/                # "is this business logic?"
+│   ├── auth/               # Registration/login, JWT, refresh rotation, Google OAuth
 │   ├── user/               # User management, avatar, role
 │   ├── role/               # Role CRUD
 │   ├── messages/           # Real-time chat (gateway + service)
-│   ├── mail/               # Email (Handlebars templates)
-│   ├── upload/             # File uploads (S3)
+│   ├── upload/             # File uploads
 │   └── health/             # Health check (Terminus + Prisma)
-├── auth/                   # WebSocket guard (ws-jwt-auth.guard.ts)
-├── configs/                # env.validation, swagger.config, constants
-├── core/                   # Shared models (pagination params/response)
-├── decorator/              # AuthenticatedController, pagination, current-user-id, roles, ...
-├── guard/                  # RolesGuard, ...
-├── helpers/                # PrismaService + PrismaModule
-├── lib/                    # file-upload.service, ...
-├── middlewares/            # logger, global error handler
-├── enums/ · constants/ · types/ · utils/   # ResponseUtil & utilities
+│
+└── test/                   # shared test utilities (createMock, factories)
+
 prisma/
 ├── schema.prisma           # Database schema
 └── migrations/             # Migration history

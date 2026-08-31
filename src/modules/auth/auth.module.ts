@@ -1,31 +1,33 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 
-import { AuthController } from '@app/src/modules/auth/auth.controller';
-import { AuthService } from '@app/src/modules/auth/auth.service';
-import { PasswordService } from '@app/src/modules/auth/services/password.service';
-import { RegistrationService } from '@app/src/modules/auth/services/registration.service';
-import { TokenService } from '@app/src/modules/auth/services/token.service';
-import { GoogleStrategy } from '@app/src/modules/auth/strategies/google.strategy';
-import { JwtStrategy } from '@app/src/modules/auth/strategies/jwt.strategy';
-import { TokenCleanupService } from '@app/src/modules/auth/token-cleanup.service';
-import { MailService } from '@app/src/modules/mail/mail.service';
+import { JwtCoreModule } from '@/core/jwt/jwt-core.module';
+import { MailModule } from '@/integrations/mail/mail.module';
+import { RoleModule } from '@/modules/role/role.module';
+import { UserModule } from '@/modules/user/user.module';
+
+import { AuthController } from './auth.controller';
+import { AuthService } from './auth.service';
+import { PasswordHasher } from './password-hasher.service';
+import { RefreshTokenRepository } from './refresh-token.repository';
+import { PasswordService } from './services/password.service';
+import { RegistrationService } from './services/registration.service';
+import { TokenService } from './services/token.service';
+import { GoogleStrategy } from './strategies/google.strategy';
+import { JwtStrategy } from './strategies/jwt.strategy';
+import { TokenCleanupService } from './token-cleanup.service';
 
 @Module({
   imports: [
     PassportModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('jwt.accessSecret'),
-        signOptions: {
-          expiresIn: configService.get<string>('jwt.accessExpiresIn'),
-        },
-      }),
-      inject: [ConfigService],
-    }),
+    JwtCoreModule,
+    // Import module thay vì liệt kê MailService/UserService vào `providers`:
+    // khai báo trong `providers` sẽ tạo instance riêng, đi vòng qua ranh giới
+    // module và phụ thuộc ngầm vào việc MailerModule tình cờ là @Global.
+    MailModule,
+    UserModule,
+    RoleModule,
   ],
   controllers: [AuthController],
   providers: [
@@ -33,11 +35,12 @@ import { MailService } from '@app/src/modules/mail/mail.service';
     TokenService,
     RegistrationService,
     PasswordService,
-    JwtStrategy,
+    PasswordHasher,
+    RefreshTokenRepository,
     TokenCleanupService,
-    MailService,
-    // Chỉ đăng ký GoogleStrategy khi đã cấu hình Google OAuth.
-    // Tránh passport-google-oauth20 ném lỗi lúc khởi động khi thiếu clientID.
+    JwtStrategy,
+    // Chỉ đăng ký GoogleStrategy khi đã cấu hình Google OAuth — tránh
+    // passport-google-oauth20 ném lỗi lúc khởi động khi thiếu clientID.
     {
       provide: GoogleStrategy,
       useFactory: (configService: ConfigService) =>

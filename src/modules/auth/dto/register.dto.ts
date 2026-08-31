@@ -14,7 +14,7 @@ import {
   PASSWORD_MIN_LENGTH,
   PASSWORD_REGEX,
   PASSWORD_VALIDATION_MESSAGE,
-} from '@app/src/modules/auth/constants/password.constant';
+} from '@/modules/auth/constants/password.constant';
 
 export class RegisterDto {
   @ApiProperty()

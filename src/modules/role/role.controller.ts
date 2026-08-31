@@ -1,46 +1,45 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Post,
-  Query,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Body, Delete, Get, Param, Post } from '@nestjs/common';
+import { ApiTags } from '@nestjs/swagger';
 
-import { ApiCommonResponses } from '@app/src/common/decorators/api-common-responses.decorator';
-import { CommonPagination } from '@app/src/common/decorators/common-pagination.decorator';
-import { Roles } from '@app/src/common/decorators/roles.decorator';
-import { CreateRoleDto } from '@app/src/modules/role/dto/create.dto';
-import { RoleDto } from '@app/src/modules/role/dto/role.dto';
-import { RoleService } from '@app/src/modules/role/role.service';
+import { Role } from '@prisma/client';
 
-@ApiBearerAuth()
+import { ApiCommonResponses } from '@/shared/decorators/api-common-responses.decorator';
+import { AuthenticatedController } from '@/shared/decorators/authenticated-controller.decorator';
+import { CommonPagination } from '@/shared/decorators/common-pagination.decorator';
+import { Pagination } from '@/shared/decorators/pagination.decorator';
+import { ResponseMessage } from '@/shared/decorators/response-message.decorator';
+import { Roles } from '@/shared/decorators/roles.decorator';
+import { Paginated } from '@/shared/pagination/paginated';
+import { PaginationParams } from '@/shared/pagination/pagination-params';
+
+import { CreateRoleDto } from './dto/create-role.dto';
+import { ADMIN_ROLE_NAME, ROLE_SORT_FIELDS } from './role.constants';
+import { RoleService } from './role.service';
+
 @ApiTags('Role')
-@Controller('role')
+@AuthenticatedController('role')
+@Roles(ADMIN_ROLE_NAME)
 export class RoleController {
-  constructor(private rolesService: RoleService) {}
+  constructor(private readonly roleService: RoleService) {}
 
-  @Roles('ADMIN')
-  @ApiCommonResponses('Tạo mới role')
   @Post()
-  async createRole(@Body() data: CreateRoleDto) {
-    return this.rolesService.createRole(data);
+  @ApiCommonResponses('Tạo mới role')
+  @ResponseMessage('Role created successfully')
+  createRole(@Body() data: CreateRoleDto): Promise<Role> {
+    return this.roleService.createRole(data);
   }
 
-  @Roles('ADMIN')
-  @CommonPagination()
   @Get()
   @ApiCommonResponses('Lấy tất cả các role')
-  async getRoles(@Query() filter: RoleDto) {
-    return this.rolesService.getRoles(filter);
+  @CommonPagination(ROLE_SORT_FIELDS)
+  getRoles(@Pagination() params: PaginationParams): Promise<Paginated<Role>> {
+    return this.roleService.getRoles(params);
   }
 
-  @Roles('ADMIN')
   @Delete(':id')
   @ApiCommonResponses('Xóa role')
-  async deleteRole(@Param('id') id: string) {
-    return this.rolesService.deleteRole(id);
+  @ResponseMessage('Role deleted successfully')
+  deleteRole(@Param('id') id: string): Promise<void> {
+    return this.roleService.deleteRole(id);
   }
 }

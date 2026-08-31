@@ -3,8 +3,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 import { SkipThrottle } from '@nestjs/throttler';
 
-import { Public } from '@app/src/common/decorators/public.decorator';
-import { SkipTransform } from '@app/src/common/decorators/skip-transform.decorator';
+import { Public } from '@/shared/decorators/public.decorator';
+import { SkipTransform } from '@/shared/decorators/skip-transform.decorator';
 
 import { PrismaHealthIndicator } from './prisma.health';
 

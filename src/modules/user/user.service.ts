@@ -1,173 +1,99 @@
 import {
   ForbiddenException,
-  HttpException,
-  HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 
-import { Prisma, User } from '@prisma/client';
+import { AVATAR_FOLDER } from '@/integrations/storage/storage.constants';
+import { StorageService } from '@/integrations/storage/storage.service';
+import { ADMIN_ROLE_NAME } from '@/modules/role/role.constants';
+import { RoleRepository } from '@/modules/role/role.repository';
+import { Paginated } from '@/shared/pagination/paginated';
+import { PaginationParams } from '@/shared/pagination/pagination-params';
 
-import { paginate } from '@app/src/common/helpers/paginate';
-import { PaginationParams } from '@app/src/common/pagination/pagination-params';
-import { PaginationResponse } from '@app/src/common/pagination/pagination-response';
-import { USER_SELECT } from '@app/src/configs/const';
-import { FileUploadService } from '@app/src/lib/file-upload.service';
-import { UpdateUserDto } from '@app/src/modules/user/dto/user.dto';
-import { PrismaService } from '@app/src/prisma/prisma.service';
-import { ResponseUtil } from '@app/src/utils/response.util';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UserCountDto, UserDto } from './dto/user-response.dto';
+import { toUserDto } from './user.mapper';
+import { SafeUserRow, UserRepository } from './user.repository';
 
 @Injectable()
 export class UserService {
-  private static readonly ALLOWED_SORT_FIELDS = [
-    'createAt',
-    'updateAt',
-    'name',
-    'email',
-  ] as const;
-
   constructor(
-    private prismaService: PrismaService,
-    private fileUploadService: FileUploadService,
+    private readonly userRepository: UserRepository,
+    private readonly roleRepository: RoleRepository,
+    private readonly storageService: StorageService,
   ) {}
 
-  async getAll(pagination: PaginationParams) {
-    const { itemsPerPage, skip, search, page, sort, sortBy } = pagination;
-    const where: Prisma.UserWhereInput = search
-      ? {
-          OR: [
-            { name: { contains: search, mode: 'insensitive' } },
-            { email: { contains: search, mode: 'insensitive' } },
-          ],
-        }
-      : {};
-
-    const sortField =
-      typeof sortBy === 'string' &&
-      UserService.ALLOWED_SORT_FIELDS.includes(
-        sortBy as (typeof UserService.ALLOWED_SORT_FIELDS)[number],
-      )
-        ? sortBy
-        : 'createAt';
-    const orderBy: Prisma.UserOrderByWithRelationInput = {
-      [sortField]: sort ?? 'desc',
-    };
-
-    return paginate(this.prismaService.user, {
-      where,
-      orderBy,
-      select: USER_SELECT,
-      page,
-      itemsPerPage,
-      skip,
-    });
+  getAll(pagination: PaginationParams): Promise<Paginated<SafeUserRow>> {
+    return this.userRepository.paginate(pagination);
   }
 
-  async getDetail(id: string): Promise<Partial<User>> {
-    const user = await this.prismaService.user.findUnique({
-      where: { id },
-      select: USER_SELECT,
-    });
-
+  async getDetail(id: string): Promise<UserDto> {
+    const user = await this.userRepository.findByIdWithRole(id);
     if (!user) {
       throw new NotFoundException('User not found');
     }
-
-    return user;
+    return toUserDto(user);
   }
 
-  async updateMeUser(data: UpdateUserDto, id: string) {
-    // Chỉ cho phép cập nhật các field hồ sơ cá nhân.
-    // KHÔNG nhận roleId/isVerified... từ client để tránh leo thang đặc quyền.
+  async updateMe(id: string, data: UpdateUserDto): Promise<UserDto> {
+    // Chỉ nhận các field hồ sơ cá nhân. KHÔNG nhận roleId/isVerified... từ client
+    // để tránh leo thang đặc quyền.
     const { name, address, country, phone, date_of_birth } = data;
-    const user = await this.prismaService.user.update({
-      where: { id },
-      data: { name, address, country, phone, date_of_birth },
+    const user = await this.userRepository.updateProfile(id, {
+      name,
+      address,
+      country,
+      phone,
+      date_of_birth,
     });
-
-    return ResponseUtil.success(
-      ResponseUtil.formatUserResponse(user),
-      'User updated successfully',
-    );
+    return toUserDto(user);
   }
 
   async updateUserRole(
     userId: string,
     roleId: string,
     currentUserId: string,
-  ): Promise<PaginationResponse<User>> {
+  ): Promise<UserDto> {
     if (userId === currentUserId) {
       throw new ForbiddenException('You cannot update your own role.');
     }
-
-    const role = await this.prismaService.role.findUnique({
-      where: { id: roleId },
-    });
-
-    if (!role) {
-      throw new HttpException(
-        { message: 'Role not found.' },
-        HttpStatus.NOT_FOUND,
-      );
+    if (!(await this.roleRepository.findById(roleId))) {
+      throw new NotFoundException('Role not found.');
     }
 
-    const user = await this.prismaService.user.update({
-      where: { id: userId },
-      data: { roleId },
-    });
-
-    return ResponseUtil.success(
-      ResponseUtil.formatUserResponse(user),
-      'User role updated successfully',
-    );
+    const user = await this.userRepository.updateRole(userId, roleId);
+    return toUserDto(user);
   }
 
-  async updateAvatarS3(
+  async updateAvatar(
     userId: string,
     file: Express.Multer.File,
-  ): Promise<User> {
+  ): Promise<UserDto> {
     // Không cần findUnique trước: nếu user không tồn tại, update sẽ ném P2025
     // và được AllExceptionsFilter chuẩn hoá thành 404.
-    const avatarUrl = await this.fileUploadService.uploadImageToS3(
-      file,
-      'avatars',
-    );
-
-    return this.prismaService.user.update({
-      where: { id: userId },
-      data: { avatar: avatarUrl },
-    });
+    const avatarUrl = await this.storageService.upload(file, AVATAR_FOLDER);
+    const user = await this.userRepository.updateAvatar(userId, avatarUrl);
+    return toUserDto(user);
   }
 
-  async deleteUser(userId: string, currentUserId: string) {
-    const userToDelete = await this.prismaService.user.findUnique({
-      where: { id: userId },
-      include: {
-        role: {
-          select: {
-            name: true,
-          },
-        },
-      },
-    });
-
-    if (!userToDelete) {
-      throw new NotFoundException('User không tồn tại');
-    }
-    if (userToDelete.role?.name === 'ADMIN') {
-      throw new ForbiddenException('Không thể xóa tài khoản có vai trò ADMIN');
-    }
-    if (userToDelete.id === currentUserId) {
+  async deleteUser(userId: string, currentUserId: string): Promise<void> {
+    if (userId === currentUserId) {
       throw new ForbiddenException('Không thể tự xóa chính mình');
     }
-    await this.prismaService.user.delete({
-      where: { id: userId },
-    });
-    return { message: 'Xóa user thành công' };
+
+    const user = await this.userRepository.findByIdWithRole(userId);
+    if (!user) {
+      throw new NotFoundException('User không tồn tại');
+    }
+    if (user.role?.name === ADMIN_ROLE_NAME) {
+      throw new ForbiddenException('Không thể xóa tài khoản có vai trò ADMIN');
+    }
+
+    await this.userRepository.delete(userId);
   }
 
-  async getCountUser(): Promise<{ data: { total: number } }> {
-    const totalUsers = await this.prismaService.user.count();
-    return { data: { total: totalUsers } };
+  async getCountUser(): Promise<UserCountDto> {
+    return { total: await this.userRepository.count() };
   }
 }

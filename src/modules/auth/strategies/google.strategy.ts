@@ -4,11 +4,7 @@ import { PassportStrategy } from '@nestjs/passport';
 
 import { Profile, Strategy, VerifyCallback } from 'passport-google-oauth20';
 
-export interface GoogleUser {
-  email: string;
-  name: string;
-  googleId: string;
-}
+import { GoogleProfile } from '../types/auth.types';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
@@ -22,7 +18,14 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     });
   }
 
-  /** Giá trị trả về được Passport gắn vào request.user và truyền cho AuthService.googleLogin */
+  /**
+   * Giá trị trả về được Passport gắn vào `request.user` và truyền cho
+   * `AuthService.googleLogin`.
+   *
+   * Ở callback OAuth, `request.user` mang HỒ SƠ GOOGLE (chưa có user trong DB),
+   * chứ không phải `AuthenticatedUser` như các route đã đăng nhập — nên phải ép
+   * kiểu một lần tại đây, và `AuthController.googleAuthCallback` ép ngược lại.
+   */
   validate(
     _accessToken: string,
     _refreshToken: string,
@@ -35,11 +38,11 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       return;
     }
 
-    const user: GoogleUser = {
+    const googleProfile: GoogleProfile = {
       email,
       name: profile.displayName ?? email,
       googleId: profile.id,
     };
-    done(null, user);
+    done(null, googleProfile as unknown as Express.User);
   }
 }

@@ -2,34 +2,37 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 
-import { PrismaService } from '@app/src/prisma/prisma.service';
+import { UserRepository, UserWithRole } from '@/modules/user/user.repository';
 
-import { hashToken } from '../auth.helpers';
+import { hashToken } from '../auth.crypto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
-import { AuthTokens, JwtPayload, UserWithRole } from '../types/auth.types';
+import { RefreshTokenRepository } from '../refresh-token.repository';
+import { AuthTokens, JwtPayload } from '../types/auth.types';
+
+const REFRESH_TOKEN_TTL_DAYS = 7;
 
 /**
- * Manages the token lifecycle: signing access/refresh tokens, persisting the
- * hashed refresh token (rotation), refresh with reuse-detection, and logout.
+ * Vòng đời token: ký cặp access/refresh, lưu hash của refresh token (rotation),
+ * refresh kèm reuse-detection, và logout.
  */
 @Injectable()
 export class TokenService {
-  private static readonly REFRESH_TOKEN_TTL_DAYS = 7;
-
   constructor(
-    private readonly prismaService: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly userRepository: UserRepository,
+    private readonly refreshTokenRepository: RefreshTokenRepository,
   ) {}
 
-  /** Sign an access/refresh token pair and store the hashed refresh token to support rotation */
+  /** Ký cặp access/refresh và lưu hash refresh token để hỗ trợ rotation. */
   async generateTokens(user: UserWithRole): Promise<AuthTokens> {
     const payload: JwtPayload = {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role.name,
+      role: user.role?.name,
     };
+
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('jwt.accessSecret'),
@@ -40,48 +43,29 @@ export class TokenService {
         expiresIn: this.configService.get<string>('jwt.refreshExpiresIn'),
       }),
     ]);
-    await this.persistRefreshToken(user.id, refreshToken);
-    return { accessToken, refreshToken };
-  }
 
-  /** Store the hash of the refresh token in the DB to support rotation + revoke */
-  private async persistRefreshToken(
-    userId: string,
-    refreshToken: string,
-  ): Promise<void> {
     const expiresAt = new Date();
-    expiresAt.setDate(
-      expiresAt.getDate() + TokenService.REFRESH_TOKEN_TTL_DAYS,
+    expiresAt.setDate(expiresAt.getDate() + REFRESH_TOKEN_TTL_DAYS);
+    await this.refreshTokenRepository.create(
+      user.id,
+      hashToken(refreshToken),
+      expiresAt,
     );
-    await this.prismaService.refreshToken.create({
-      data: {
-        tokenHash: hashToken(refreshToken),
-        userId,
-        expiresAt,
-      },
-    });
+
+    return { accessToken, refreshToken };
   }
 
   /**
    * Refresh token rotation:
-   * - Verify the signature + match the hash in the DB (guards against revoked/forged tokens)
-   * - Reuse-detection: a revoked token used again -> revoke the user's entire session set
-   * - Revoke the old token, then issue a new pair
+   * - Verify chữ ký + đối chiếu hash trong DB (chặn token đã thu hồi/giả mạo).
+   * - Reuse-detection: token đã thu hồi mà bị dùng lại -> thu hồi toàn bộ phiên.
+   * - Thu hồi token cũ rồi cấp cặp mới.
    */
-  async refreshToken(refreshTokenDto: RefreshTokenDto): Promise<AuthTokens> {
-    let decoded: JwtPayload;
-    try {
-      decoded = this.jwtService.verify(refreshTokenDto.refreshToken, {
-        secret: this.configService.get<string>('jwt.refreshSecret'),
-      });
-    } catch {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    const tokenHash = hashToken(refreshTokenDto.refreshToken);
-    const stored = await this.prismaService.refreshToken.findUnique({
-      where: { tokenHash },
-    });
+  async refreshToken({ refreshToken }: RefreshTokenDto): Promise<AuthTokens> {
+    const decoded = this.verifyRefreshToken(refreshToken);
+    const stored = await this.refreshTokenRepository.findByHash(
+      hashToken(refreshToken),
+    );
 
     if (!stored || stored.expiresAt < new Date()) {
       throw new UnauthorizedException(
@@ -89,41 +73,36 @@ export class TokenService {
       );
     }
 
-    // Reuse-detection: the token was already revoked (rotated) but is being used
-    // again -> likely stolen. Revoke ALL of the user's refresh tokens.
     if (stored.revoked) {
-      await this.prismaService.refreshToken.updateMany({
-        where: { userId: stored.userId },
-        data: { revoked: true },
-      });
+      // Token đã rotate nhưng bị dùng lại -> nhiều khả năng bị đánh cắp.
+      await this.refreshTokenRepository.revokeAllForUser(stored.userId);
       throw new UnauthorizedException(
         'Refresh token reuse detected; all sessions have been revoked',
       );
     }
 
-    // Rotation: revoke the old token before issuing a new one
-    await this.prismaService.refreshToken.update({
-      where: { id: stored.id },
-      data: { revoked: true },
-    });
+    await this.refreshTokenRepository.revokeById(stored.id);
 
-    const user = await this.prismaService.user.findUnique({
-      where: { id: decoded.id },
-      include: { role: true },
-    });
-    if (!user || !user.role) {
+    const user = await this.userRepository.findByIdWithRole(decoded.id);
+    if (!user) {
       throw new UnauthorizedException('User not found');
     }
 
-    return this.generateTokens(user as UserWithRole);
+    return this.generateTokens(user);
   }
 
-  /** Log out: revoke the current refresh token */
-  async logout(refreshToken: string): Promise<{ message: string }> {
-    await this.prismaService.refreshToken.updateMany({
-      where: { tokenHash: hashToken(refreshToken) },
-      data: { revoked: true },
-    });
-    return { message: 'Logged out successfully' };
+  private verifyRefreshToken(refreshToken: string): JwtPayload {
+    try {
+      return this.jwtService.verify<JwtPayload>(refreshToken, {
+        secret: this.configService.get<string>('jwt.refreshSecret'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+  }
+
+  /** Đăng xuất: thu hồi refresh token hiện tại. */
+  async logout(refreshToken: string): Promise<void> {
+    await this.refreshTokenRepository.revokeByHash(hashToken(refreshToken));
   }
 }

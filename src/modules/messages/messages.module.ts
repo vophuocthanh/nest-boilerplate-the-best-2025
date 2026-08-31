@@ -1,23 +1,15 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
 
-import { MessagesGateway } from '@app/src/modules/messages/messages.gateway';
-import { MessageService } from '@app/src/modules/messages/messages.service';
+import { JwtCoreModule } from '@/core/jwt/jwt-core.module';
+import { UserModule } from '@/modules/user/user.module';
+
+import { MessagesGateway } from './messages.gateway';
+import { MessageService } from './messages.service';
 
 @Module({
-  imports: [
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('jwt.accessSecret'),
-        signOptions: {
-          expiresIn: configService.get<string>('jwt.accessExpiresIn'),
-        },
-      }),
-      inject: [ConfigService],
-    }),
-  ],
+  // JwtCoreModule thay cho khối JwtModule.registerAsync từng bị copy y hệt từ
+  // AuthModule — cấu hình ký JWT giờ chỉ tồn tại một bản.
+  imports: [JwtCoreModule, UserModule],
   providers: [MessagesGateway, MessageService],
   exports: [MessageService],
 })

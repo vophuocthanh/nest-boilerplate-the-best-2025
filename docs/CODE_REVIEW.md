@@ -9,8 +9,10 @@ Mỗi mục là một tiêu chí **chấp nhận** — fail bất kỳ mục nà
 ---
 
 ## 1. Đúng kiến trúc & quy ước
-- [ ] Code đặt đúng `src/modules/<feature>/` hoặc `src/common/`.
-- [ ] Import dùng alias `@app/src` / `src`, không dùng đường dẫn `../../..` sâu.
+- [ ] Code đặt đúng tầng: `modules/` (nghiệp vụ) · `core/` (chạy mọi request) · `shared/` (tái dùng) · `integrations/` (gọi ra ngoài) · `config/` (đến từ env).
+- [ ] Không phá ranh giới tầng — `pnpm lint` phải xanh (`no-restricted-imports` sẽ chặn).
+- [ ] Import xuyên tầng/xuyên module dùng alias `@/…`; trong cùng module dùng `./…`.
+- [ ] Module mới tạo bằng `pnpm gen`, đủ controller/service/repository/mapper.
 - [ ] Controller không chứa business logic; logic nằm ở service.
 - [ ] Tuân thủ [CODING_STANDARDS.md](./CODING_STANDARDS.md).
 
@@ -20,12 +22,13 @@ Mỗi mục là một tiêu chí **chấp nhận** — fail bất kỳ mục nà
 - [ ] Lấy user qua `@CurrentUserId()` / `@CurrentUser()`.
 
 ## 3. Cấu hình
-- [ ] Không có `process.env` ngoài `main.ts` / `configs/`.
+- [ ] Không có `process.env` ngoài `main.ts` / `app.controller.ts` / `config/`.
 - [ ] Biến mới đã được khai báo ở `env.validation.ts` **và** `configuration.ts`.
 
 ## 4. Xử lý lỗi & response
 - [ ] Lỗi được `throw` bằng exception NestJS, không trả lỗi thủ công.
-- [ ] Không tự bọc `{ statusCode, ... }` trong controller.
+- [ ] Không tự bọc `{ statusCode, ... }` / `{ data, message }` trong controller hay service.
+- [ ] Message tuỳ biến khai báo bằng `@ResponseMessage()`, không nhét vào payload.
 - [ ] Không nuốt lỗi (`catch {}` rỗng) làm mất stack/thông tin.
 
 ## 5. Validation & dữ liệu
@@ -33,21 +36,22 @@ Mỗi mục là một tiêu chí **chấp nhận** — fail bất kỳ mục nà
 - [ ] Trường ngày dùng `@Type(() => Date) @IsDate()` khớp `DateTime`.
 
 ## 6. Bảo mật
-- [ ] **Không lộ** `password`, `verificationCode`, `resetToken`, `tokenHash`… trong response.
+- [ ] **Không lộ** `password`, `verificationCode`, `resetToken`, `googleId`, `lockedUntil`… trong response.
+- [ ] Entity trả ra client đi qua `*.mapper.ts` (whitelist), KHÔNG dùng blacklist `delete obj.x`.
 - [ ] Token lưu DB ở dạng **hash**, không lưu thô.
 - [ ] Random bảo mật dùng `crypto`, không `Math.random()`.
 - [ ] Không tạo account enumeration (login/forgot trả thông báo chung).
 - [ ] Endpoint nhạy cảm có `@Throttle()`.
 
 ## 7. Prisma / hiệu năng
-- [ ] Dùng `select` thay vì trả nguyên entity.
-- [ ] Danh sách có phân trang (`ResponseUtil.paginate`).
-- [ ] Count + findMany chạy song song khi cần.
+- [ ] Truy vấn nằm trong repository của module sở hữu bảng, không rải ra service/module khác.
+- [ ] Dùng `select` / mapper thay vì trả nguyên entity.
+- [ ] Danh sách có phân trang qua `paginate()`, kèm `allowedSortFields`.
 - [ ] Schema đổi → có migration; không sửa DB tay.
 
 ## 8. Chất lượng & test
-- [ ] `pnpm run build` xanh.
-- [ ] `pnpm run lint` xanh, không warning mới.
+- [ ] `pnpm typecheck` và `pnpm build` xanh.
+- [ ] `pnpm lint` xanh, không warning mới.
 - [ ] `pnpm test` xanh; logic mới có unit test.
 - [ ] Không để lại code chết / import thừa / `console.log` debug.
 
